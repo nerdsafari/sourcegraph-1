@@ -1,6 +1,6 @@
 import React from 'react'
 import * as GQL from '../../../../../shared/src/graphql/schema'
-import { CampaignDetails } from './CampaignDetails'
+import { CampaignDetailArea } from './CampaignDetailArea'
 import * as H from 'history'
 import { of } from 'rxjs'
 import { NOOP_TELEMETRY_SERVICE } from '../../../../../shared/src/telemetry/telemetryService'
@@ -16,7 +16,7 @@ jest.mock('../icons', () => ({ CampaignsIcon: 'CampaignsIcon' }))
 
 const history = H.createMemoryHistory()
 
-describe('CampaignDetails', () => {
+describe('CampaignDetailArea', () => {
     afterEach(() => {
         PageTitle.titleSet = false
     })
@@ -24,7 +24,7 @@ describe('CampaignDetails', () => {
     test('creation form for empty manual campaign', () =>
         expect(
             shallow(
-                <CampaignDetails
+                <CampaignDetailArea
                     campaignID={undefined}
                     history={history}
                     location={history.location}
@@ -39,7 +39,7 @@ describe('CampaignDetails', () => {
 
     test('creation form given existing patch set', () => {
         const component = mount(
-            <CampaignDetails
+            <CampaignDetailArea
                 campaignID={undefined}
                 history={history}
                 location={{ ...history.location, search: 'patchSet=p' }}
@@ -54,7 +54,7 @@ describe('CampaignDetails', () => {
     })
 
     const renderCampaignDetails = ({ viewerCanAdminister }: { viewerCanAdminister: boolean }) => (
-        <CampaignDetails
+        <CampaignDetailArea
             campaignID="c"
             history={history}
             location={history.location}

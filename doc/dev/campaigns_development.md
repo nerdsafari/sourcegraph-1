@@ -11,6 +11,10 @@ Before diving into the technical part of campaigns, make sure to read up on what
 
 See "[Campaigns design doc](campaigns_design.md)".
 
+## [Campaigns design doc](campaigns_design.md)
+
+See "[Campaigns design doc](campaigns_design.md)".
+
 ## Starting up your environment
 
 1. Run `./enterprise/dev/start.sh` and wait until all repositories are cloned.
