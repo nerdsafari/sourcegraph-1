@@ -18,6 +18,7 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/bitbucketserver"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/github"
 	"github.com/sourcegraph/sourcegraph/internal/extsvc/gitlab"
+	gitlabwebhooks "github.com/sourcegraph/sourcegraph/internal/extsvc/gitlab/webhooks"
 	"github.com/sourcegraph/sourcegraph/internal/vcs/git"
 )
 
@@ -1483,6 +1484,12 @@ func ChangesetEventKindFor(e interface{}) ChangesetEventKind {
 		return ChangesetEventKindGitLabApproved
 	case *gitlab.ReviewUnapproved:
 		return ChangesetEventKindGitLabUnapproved
+	case *gitlabwebhooks.MergeRequestCloseEvent:
+		return ChangesetEventKindGitLabClosed
+	case *gitlabwebhooks.MergeRequestMergeEvent:
+		return ChangesetEventKindGitLabMerged
+	case *gitlabwebhooks.MergeRequestReopenEvent:
+		return ChangesetEventKindGitLabReopened
 	default:
 		panic(errors.Errorf("unknown changeset event kind for %T", e))
 	}
@@ -1548,6 +1555,12 @@ func NewChangesetEventMetadata(k ChangesetEventKind) (interface{}, error) {
 			return new(gitlab.Pipeline), nil
 		case ChangesetEventKindGitLabUnapproved:
 			return new(gitlab.ReviewUnapproved), nil
+		case ChangesetEventKindGitLabClosed:
+			return new(gitlabwebhooks.MergeRequestCloseEvent), nil
+		case ChangesetEventKindGitLabMerged:
+			return new(gitlabwebhooks.MergeRequestMergeEvent), nil
+		case ChangesetEventKindGitLabReopened:
+			return new(gitlabwebhooks.MergeRequestReopenEvent), nil
 		}
 	}
 	return nil, errors.Errorf("unknown changeset event kind %q", k)
@@ -1596,7 +1609,10 @@ const (
 	ChangesetEventKindBitbucketServerDismissed ChangesetEventKind = "bitbucketserver:participant_status:unapproved"
 
 	ChangesetEventKindGitLabApproved   ChangesetEventKind = "gitlab:approved"
+	ChangesetEventKindGitLabClosed     ChangesetEventKind = "gitlab:closed"
+	ChangesetEventKindGitLabMerged     ChangesetEventKind = "gitlab:merged"
 	ChangesetEventKindGitLabPipeline   ChangesetEventKind = "gitlab:pipeline"
+	ChangesetEventKindGitLabReopened   ChangesetEventKind = "gitlab:reopened"
 	ChangesetEventKindGitLabUnapproved ChangesetEventKind = "gitlab:unapproved"
 )
 
