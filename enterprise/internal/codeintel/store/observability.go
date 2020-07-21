@@ -14,6 +14,7 @@ import (
 type ObservedStore struct {
 	store                                   Store
 	doneOperation                           *observation.Operation
+	lockOperation                           *observation.Operation
 	getUploadByIDOperation                  *observation.Operation
 	getUploadsOperation                     *observation.Operation
 	queueSizeOperation                      *observation.Operation
@@ -76,6 +77,11 @@ func NewObserved(store Store, observationContext *observation.Context) Store {
 		doneOperation: observationContext.Operation(observation.Op{
 			Name:         "store.Done",
 			MetricLabels: []string{"done"},
+			Metrics:      metrics,
+		}),
+		lockOperation: observationContext.Operation(observation.Op{
+			Name:         "store.Lock",
+			MetricLabels: []string{"lock"},
 			Metrics:      metrics,
 		}),
 		getUploadByIDOperation: observationContext.Operation(observation.Op{
@@ -310,6 +316,7 @@ func (s *ObservedStore) wrap(other Store) Store {
 	return &ObservedStore{
 		store:                                   other,
 		doneOperation:                           s.doneOperation,
+		lockOperation:                           s.lockOperation,
 		getUploadByIDOperation:                  s.getUploadByIDOperation,
 		deleteUploadsWithoutRepositoryOperation: s.deleteUploadsWithoutRepositoryOperation,
 		getUploadsOperation:                     s.getUploadsOperation,
@@ -392,7 +399,9 @@ func (s *ObservedStore) Done(e error) error {
 }
 
 // TODO - observe, document
-func (s *ObservedStore) Lock(ctx context.Context, key int, blocking bool) (bool, UnlockFunc, error) {
+func (s *ObservedStore) Lock(ctx context.Context, key int, blocking bool) (_ bool, _ UnlockFunc, err error) {
+	ctx, endObservation := s.lockOperation.With(ctx, &err, observation.Args{})
+	defer endObservation(1, observation.Args{})
 	return s.store.Lock(ctx, key, blocking)
 }
 
