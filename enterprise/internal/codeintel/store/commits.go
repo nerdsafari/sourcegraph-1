@@ -118,17 +118,24 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 		}
 	}
 
-	// TODO - write a small helper for this
-	for len(rows) > 0 {
-		var batch []*sqlf.Query
-		if len(rows) > 65535/4 {
-			batch = rows[:65535/4]
-			rows = rows[65535/4:]
-		} else {
-			batch = rows
-			rows = nil
+	// TODO - extract
+	batch := func(queries []*sqlf.Query, n int) [][]*sqlf.Query {
+		batchSize := 65535 / n // TODO - define a constant
+
+		var batches [][]*sqlf.Query
+		for len(queries) > 0 {
+			if len(queries) > batchSize {
+				batches = append(batches, queries[:batchSize])
+				queries = queries[batchSize:]
+			} else {
+				batches = append(batches, queries)
+			}
 		}
 
+		return batches
+	}
+
+	for _, batch := range batch(rows, 4) {
 		if err := tx.queryForEffect(ctx, sqlf.Sprintf(
 			`INSERT INTO lsif_nearest_uploads (repository_id, "commit", upload_id, distance) VALUES %s`,
 			sqlf.Join(batch, ","),
