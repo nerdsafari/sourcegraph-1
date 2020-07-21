@@ -267,7 +267,7 @@ func TestInsertIndex(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := rawTestStore() // TODO - make all these testStores if possible
 
 	insertRepo(t, dbconn.Global, 50, "")
 

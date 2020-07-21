@@ -35,6 +35,7 @@ func makeCommit(i int) string {
 	return fmt.Sprintf("%040d", i)
 }
 
+// TODO
 // getDumpVisibilities returns a map from dump identifiers to its visibility. Fails the test on error.
 func getDumpVisibilities(t *testing.T, db *sql.DB) map[int]bool {
 	// TODO - replace
@@ -183,6 +184,25 @@ func insertPackageReferences(t *testing.T, store Store, packageReferences []type
 	if err := store.UpdatePackageReferences(context.Background(), packageReferences); err != nil {
 		t.Fatalf("unexpected error updating package references: %s", err)
 	}
+}
+
+// insertNearestUploads populates the lsif_nearest_uploads table with the given upload metadata.
+func insertNearestUploads(t *testing.T, db *sql.DB, repositoryID int, uploads map[string][]UploadMeta) {
+	var rows []*sqlf.Query
+	for commit, metas := range uploads {
+		for _, meta := range metas {
+			rows = append(rows, sqlf.Sprintf("(%s, %s, %s, %s)", repositoryID, commit, meta.UploadID, meta.Distance))
+		}
+	}
+
+	query := sqlf.Sprintf(
+		`INSERT INTO lsif_nearest_uploads (repository_id, "commit", upload_id, distance) VALUES %s`,
+		sqlf.Join(rows, ","),
+	)
+	if _, err := db.ExecContext(context.Background(), query.Query(sqlf.PostgresBindVar), query.Args()...); err != nil {
+		t.Fatalf("unexpected error while upserting repository: %s", err)
+	}
+
 }
 
 // unwrapStore gets the underlying store from a store interface value.

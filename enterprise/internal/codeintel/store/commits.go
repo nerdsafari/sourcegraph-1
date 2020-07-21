@@ -34,15 +34,11 @@ func scanUploadMeta(rows *sql.Rows, queryErr error) (_ map[string][]UploadMeta, 
 	return uploadMeta, nil
 }
 
-//
-// TODO - need to rewrite this to use the new table instead
-//
-
 // HasCommit determines if the given commit is known for the given repository.
 func (s *store) HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error) {
 	count, _, err := scanFirstInt(s.query(ctx, sqlf.Sprintf(`
 		SELECT COUNT(*)
-		FROM lsif_commits
+		FROM lsif_nearest_uploads
 		WHERE repository_id = %s and commit = %s
 		LIMIT 1
 	`, repositoryID, commit)))

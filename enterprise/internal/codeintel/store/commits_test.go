@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/sourcegraph/sourcegraph/internal/db/dbconn"
 	"github.com/sourcegraph/sourcegraph/internal/db/dbtesting"
 )
 
@@ -13,7 +14,7 @@ func TestHasCommit(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := testStore()
 
 	testCases := []struct {
 		repositoryID int
@@ -25,11 +26,8 @@ func TestHasCommit(t *testing.T) {
 		{51, makeCommit(1), false},
 	}
 
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
+	insertNearestUploads(t, dbconn.Global, 50, map[string][]UploadMeta{makeCommit(1): {{UploadID: 42, Distance: 1}}})
+	insertNearestUploads(t, dbconn.Global, 51, map[string][]UploadMeta{makeCommit(2): {{UploadID: 43, Distance: 2}}})
 
 	for _, testCase := range testCases {
 		name := fmt.Sprintf("repositoryID=%d commit=%s", testCase.repositoryID, testCase.commit)

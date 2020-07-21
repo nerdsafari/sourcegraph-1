@@ -409,18 +409,17 @@ func (s *store) GetStates(ctx context.Context, ids []int) (map[int]string, error
 	`, sqlf.Join(intsToQueries(ids), ", "))))
 }
 
-// DeleteUploadByID deletes an upload by its identifier. If the upload was visible at the tip of its repository's default branch,
-// the visibility of all uploads for that repository are recalculated. The getTipCommit function is expected to return the newest
-// commit on the default branch when invoked.
-func (s *store) DeleteUploadByID(ctx context.Context, id int, getTipCommit GetTipCommitFunc) (_ bool, err error) {
+// DeleteUploadByID deletes an upload by its identifier. This method returns a true-valued flag if a record
+// was deleted. The associated repository will be marked as dirty so that its commit graph will be updated in
+// the background.
+func (s *store) DeleteUploadByID(ctx context.Context, id int) (_ bool, err error) {
 	tx, err := s.transact(ctx)
 	if err != nil {
 		return false, err
 	}
 	defer func() { err = tx.Done(err) }()
 
-	// TODO - can select distinct?
-	repositoryIDs, err := scanInts(tx.query(
+	repositoryID, deleted, err := scanFirstInt(tx.query(
 		ctx,
 		sqlf.Sprintf(`
 			DELETE FROM lsif_uploads
@@ -431,15 +430,15 @@ func (s *store) DeleteUploadByID(ctx context.Context, id int, getTipCommit GetTi
 	if err != nil {
 		return false, err
 	}
-
-	// TODO - do in one statement
-	for _, repositoryID := range repositoryIDs {
-		if err := tx.MarkRepositoryAsDirty(ctx, repositoryID); err != nil {
-			return false, err
-		}
+	if !deleted {
+		return false, nil
 	}
 
-	return false, nil
+	if err := tx.MarkRepositoryAsDirty(ctx, repositoryID); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // DeletedRepositoryGracePeriod is the minimum allowable duration between a repo deletion

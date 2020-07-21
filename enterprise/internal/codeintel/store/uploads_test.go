@@ -745,21 +745,13 @@ func TestDeleteUploadByID(t *testing.T) {
 	store := testStore()
 
 	insertUploads(t, dbconn.Global,
-		Upload{ID: 1},
+		Upload{ID: 1, RepositoryID: 50},
 	)
 
-	var called bool
-	getTipCommit := func(ctx context.Context, repositoryID int) (string, error) {
-		called = true
-		return "", nil
-	}
-
-	if found, err := store.DeleteUploadByID(context.Background(), 1, getTipCommit); err != nil {
+	if found, err := store.DeleteUploadByID(context.Background(), 1); err != nil {
 		t.Fatalf("unexpected error deleting upload: %s", err)
 	} else if !found {
 		t.Fatalf("expected record to exist")
-	} else if called {
-		t.Fatalf("unexpected call to getTipCommit")
 	}
 
 	// Upload no longer exists
@@ -767,6 +759,15 @@ func TestDeleteUploadByID(t *testing.T) {
 		t.Fatalf("unexpected error getting upload: %s", err)
 	} else if exists {
 		t.Fatal("unexpected record")
+	}
+
+	repositoryIDs, err := store.DirtyRepositories(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error listing dirty repositories: %s", err)
+	}
+
+	if len(repositoryIDs) != 1 || repositoryIDs[0] != 50 {
+		t.Errorf("expected repository to be marked dirty")
 	}
 }
 
@@ -777,59 +778,10 @@ func TestDeleteUploadByIDMissingRow(t *testing.T) {
 	dbtesting.SetupGlobalTestDB(t)
 	store := testStore()
 
-	getTipCommit := func(ctx context.Context, repositoryID int) (string, error) {
-		return "", nil
-	}
-
-	if found, err := store.DeleteUploadByID(context.Background(), 1, getTipCommit); err != nil {
+	if found, err := store.DeleteUploadByID(context.Background(), 1); err != nil {
 		t.Fatalf("unexpected error deleting upload: %s", err)
 	} else if found {
 		t.Fatalf("unexpected record")
-	}
-}
-
-func TestDeleteUploadByIDUpdatesVisibility(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	dbtesting.SetupGlobalTestDB(t)
-	store := testStore()
-
-	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(4), Root: "sub1/", VisibleAtTip: true},
-		Upload{ID: 2, Commit: makeCommit(3), Root: "sub2/", VisibleAtTip: true},
-		Upload{ID: 3, Commit: makeCommit(2), Root: "sub1/", VisibleAtTip: false},
-		Upload{ID: 4, Commit: makeCommit(1), Root: "sub2/", VisibleAtTip: false},
-	)
-
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// 	makeCommit(2): {makeCommit(1)},
-	// 	makeCommit(3): {makeCommit(2)},
-	// 	makeCommit(4): {makeCommit(3)},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
-
-	var called bool
-	getTipCommit := func(ctx context.Context, repositoryID int) (string, error) {
-		called = true
-		return makeCommit(4), nil
-	}
-
-	if found, err := store.DeleteUploadByID(context.Background(), 1, getTipCommit); err != nil {
-		t.Fatalf("unexpected error deleting upload: %s", err)
-	} else if !found {
-		t.Fatalf("expected record to exist")
-	} else if !called {
-		t.Fatalf("expected call to getTipCommit")
-	}
-
-	expected := map[int]bool{2: true, 3: true, 4: false}
-	visibilities := getDumpVisibilities(t, dbconn.Global)
-	if diff := cmp.Diff(expected, visibilities); diff != "" {
-		t.Errorf("unexpected visibility (-want +got):\n%s", diff)
 	}
 }
 
@@ -941,5 +893,4 @@ func TestResetStalled(t *testing.T) {
 	if upload.NumResets != 2 {
 		t.Errorf("unexpected num resets. want=%d have=%d", 2, upload.NumResets)
 	}
-
 }

@@ -485,10 +485,10 @@ func (s *ObservedStore) GetStates(ctx context.Context, ids []int) (states map[in
 }
 
 // DeleteUploadByID calls into the inner store and registers the observed results.
-func (s *ObservedStore) DeleteUploadByID(ctx context.Context, id int, getTipCommit GetTipCommitFunc) (_ bool, err error) {
+func (s *ObservedStore) DeleteUploadByID(ctx context.Context, id int) (_ bool, err error) {
 	ctx, endObservation := s.deleteUploadByIDOperation.With(ctx, &err, observation.Args{})
 	defer endObservation(1, observation.Args{})
-	return s.store.DeleteUploadByID(ctx, id, getTipCommit)
+	return s.store.DeleteUploadByID(ctx, id)
 }
 
 // DeleteUploadsWithoutRepository calls into the inner store and registers the observed results.
