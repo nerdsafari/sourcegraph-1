@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/inconshreveable/log15"
 	"github.com/opentracing/opentracing-go"
@@ -38,11 +37,12 @@ func main() {
 	sqliteutil.MustRegisterSqlite3WithPcre()
 
 	var (
-		bundleManagerURL   = mustGet(rawBundleManagerURL, "PRECISE_CODE_INTEL_BUNDLE_MANAGER_URL")
-		workerPollInterval = mustParseInterval(rawWorkerPollInterval, "PRECISE_CODE_INTEL_WORKER_POLL_INTERVAL")
-		workerConcurrency  = mustParseInt(rawWorkerConcurrency, "PRECISE_CODE_INTEL_WORKER_CONCURRENCY")
-		workerBudget       = mustParseInt64(rawWorkerBudget, "PRECISE_CODE_INTEL_WORKER_BUDGET")
-		resetInterval      = mustParseInterval(rawResetInterval, "PRECISE_CODE_INTEL_RESET_INTERVAL")
+		bundleManagerURL      = mustGet(rawBundleManagerURL, "PRECISE_CODE_INTEL_BUNDLE_MANAGER_URL")
+		workerPollInterval    = mustParseInterval(rawWorkerPollInterval, "PRECISE_CODE_INTEL_WORKER_POLL_INTERVAL")
+		workerConcurrency     = mustParseInt(rawWorkerConcurrency, "PRECISE_CODE_INTEL_WORKER_CONCURRENCY")
+		workerBudget          = mustParseInt64(rawWorkerBudget, "PRECISE_CODE_INTEL_WORKER_BUDGET")
+		resetInterval         = mustParseInterval(rawResetInterval, "PRECISE_CODE_INTEL_RESET_INTERVAL")
+		commitUpdaterInterval = mustParseInterval(rawCommitUpdaterInterval, "PRECISE_CODE_INTEL_COMMIT_UPDATER_INTERVAL")
 	)
 
 	observationContext := &observation.Context{
@@ -57,9 +57,13 @@ func main() {
 	resetterMetrics := resetter.NewResetterMetrics(prometheus.DefaultRegisterer)
 	server := server.New()
 	uploadResetter := resetter.NewUploadResetter(store, resetInterval, resetterMetrics)
-	commitUpdater := commitupdater.NewUpdater(store, commits.NewUpdater(store, gitserver.DefaultClient), commitupdater.UpdaterOptions{
-		Interval: time.Second * 1, // TODO - envvar
-	})
+	commitUpdater := commitupdater.NewUpdater(
+		store,
+		commits.NewUpdater(store, gitserver.DefaultClient),
+		commitupdater.UpdaterOptions{
+			Interval: commitUpdaterInterval,
+		},
+	)
 	worker := worker.NewWorker(
 		store,
 		bundles.New(bundleManagerURL),
