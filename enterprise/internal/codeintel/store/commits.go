@@ -34,7 +34,23 @@ func scanUploadMeta(rows *sql.Rows, queryErr error) (_ map[string][]UploadMeta, 
 	return uploadMeta, nil
 }
 
-// TODO - document, test
+//
+// TODO - need to rewrite this to use the new table instead
+//
+
+// HasCommit determines if the given commit is known for the given repository.
+func (s *store) HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error) {
+	count, _, err := scanFirstInt(s.query(ctx, sqlf.Sprintf(`
+		SELECT COUNT(*)
+		FROM lsif_commits
+		WHERE repository_id = %s and commit = %s
+		LIMIT 1
+	`, repositoryID, commit)))
+
+	return count > 0, err
+}
+
+// MarkRepositoryAsDirty marks the given repository's commit graph as out of date.
 func (s *store) MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error {
 	return s.queryForEffect(
 		ctx,
@@ -46,13 +62,15 @@ func (s *store) MarkRepositoryAsDirty(ctx context.Context, repositoryID int) err
 	)
 }
 
-// TODO - document, test
+// DirtyRepositories returns the set of identifiers for repositories whose commit graphs are out of date.
 func (s *store) DirtyRepositories(ctx context.Context) ([]int, error) {
 	return scanInts(s.query(ctx, sqlf.Sprintf(`SELECT repository_id FROM lsif_dirty_repositories WHERE dirty = true`)))
 }
 
-// TODO - rename, document, test
-func (s *store) FixCommits(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error {
+// CalculateVisibleUploads uses the given commit graph and the tip commit of the default branch to determine
+// the set of LSIF uploads that are visible for each commit, and the set of uploads which are visible at the
+// tip. The decorated commit graph is serialized to Postgres for use by find closest dumps queries.
+func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error {
 	tx, err := s.transact(ctx)
 	if err != nil {
 		return err
@@ -68,41 +86,27 @@ func (s *store) FixCommits(ctx context.Context, repositoryID int, graph map[stri
 		return err
 	}
 
-	if err := tx.queryForEffect(ctx, sqlf.Sprintf(`DELETE FROM lsif_nearest_uploads WHERE repository_id = %s`, repositoryID)); err != nil {
+	visibleUploads, err := calculateVisibleUploads(graph, uploadMeta)
+	if err != nil {
 		return err
 	}
 
-	commitMeta := make(map[string]CommitMeta, len(graph))
-	for commit, parents := range graph {
-		commitMeta[commit] = CommitMeta{
-			Parents: parents,
-			Uploads: uploadMeta[commit],
-		}
-	}
-
-	// TODO - rename
-	allDistances := calculateReachability(commitMeta)
-
 	n := 0
-	for _, uploads := range allDistances {
+	for _, uploads := range visibleUploads {
 		n += len(uploads)
 	}
 
 	var ids []*sqlf.Query
-	for _, uploadMeta := range allDistances[tipCommit] {
+	for _, uploadMeta := range visibleUploads[tipCommit] {
 		ids = append(ids, sqlf.Sprintf("%s", uploadMeta.UploadID))
 	}
 
-	if err := tx.queryForEffect(ctx, sqlf.Sprintf(
-		`UPDATE lsif_uploads SET visible_at_tip = (id IN (%s)) WHERE repository_id = %s`,
-		sqlf.Join(ids, ","), // TODO - syntax error if empty, I think
-		repositoryID,
-	)); err != nil {
+	if err := tx.queryForEffect(ctx, sqlf.Sprintf(`DELETE FROM lsif_nearest_uploads WHERE repository_id = %s`, repositoryID)); err != nil {
 		return err
 	}
 
 	rows := make([]*sqlf.Query, 0, n)
-	for commit, uploads := range allDistances {
+	for commit, uploads := range visibleUploads {
 		for _, uploadMeta := range uploads {
 			rows = append(rows, sqlf.Sprintf(
 				"(%s, %s, %s, %s)",
@@ -133,6 +137,18 @@ func (s *store) FixCommits(ctx context.Context, repositoryID int, graph map[stri
 		}
 	}
 
+	//
+	// TODO - maybe don't store this directly in the table?
+	//
+
+	if err := tx.queryForEffect(ctx, sqlf.Sprintf(
+		`UPDATE lsif_uploads SET visible_at_tip = (id IN (%s)) WHERE repository_id = %s`,
+		sqlf.Join(ids, ","), // TODO - syntax error if empty, I think
+		repositoryID,
+	)); err != nil {
+		return err
+	}
+
 	// TODO - only do this if some token matches
 	if err := tx.queryForEffect(
 		ctx,
@@ -146,16 +162,4 @@ func (s *store) FixCommits(ctx context.Context, repositoryID int, graph map[stri
 	}
 
 	return nil
-}
-
-// HasCommit determines if the given commit is known for the given repository.
-func (s *store) HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error) {
-	count, _, err := scanFirstInt(s.query(ctx, sqlf.Sprintf(`
-		SELECT COUNT(*)
-		FROM lsif_commits
-		WHERE repository_id = %s and commit = %s
-		LIMIT 1
-	`, repositoryID, commit)))
-
-	return count > 0, err
 }

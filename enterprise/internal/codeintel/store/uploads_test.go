@@ -802,14 +802,15 @@ func TestDeleteUploadByIDUpdatesVisibility(t *testing.T) {
 		Upload{ID: 4, Commit: makeCommit(1), Root: "sub2/", VisibleAtTip: false},
 	)
 
-	if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-		makeCommit(1): {},
-		makeCommit(2): {makeCommit(1)},
-		makeCommit(3): {makeCommit(2)},
-		makeCommit(4): {makeCommit(3)},
-	}); err != nil {
-		t.Fatalf("unexpected error updating commits: %s", err)
-	}
+	// TODO - replace
+	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
+	// 	makeCommit(1): {},
+	// 	makeCommit(2): {makeCommit(1)},
+	// 	makeCommit(3): {makeCommit(2)},
+	// 	makeCommit(4): {makeCommit(3)},
+	// }); err != nil {
+	// 	t.Fatalf("unexpected error updating commits: %s", err)
+	// }
 
 	var called bool
 	getTipCommit := func(ctx context.Context, repositoryID int) (string, error) {

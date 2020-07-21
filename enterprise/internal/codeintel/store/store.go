@@ -29,7 +29,8 @@ type Store interface {
 	// original error value is returned unchanged.
 	Done(err error) error
 
-	// TODO - rename, document
+	// Lock attempts to take an advisory lock on the given key. If successful, this method will
+	// return a true-valued flag along with a function that must be called to release the lock.
 	Lock(ctx context.Context, key int, blocking bool) (bool, UnlockFunc, error)
 
 	// GetUploadByID returns an upload by its identifier and boolean flag indicating its existence.
@@ -120,17 +121,19 @@ type Store interface {
 	// default branch.
 	PackageReferencePager(ctx context.Context, scheme, name, version string, repositoryID, limit int) (int, ReferencePager, error)
 
-	// TODO - document
-	MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error
-
-	// TODO - document
-	DirtyRepositories(ctx context.Context) ([]int, error)
-
-	// TODO - document
-	FixCommits(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error
-
 	// HasCommit determines if the given commit is known for the given repository.
 	HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error)
+
+	// MarkRepositoryAsDirty marks the given repository's commit graph as out of date.
+	MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error
+
+	// DirtyRepositories returns the set of identifiers for repositories whose commit graphs are out of date.
+	DirtyRepositories(ctx context.Context) ([]int, error)
+
+	// CalculateVisibleUploads uses the given commit graph and the tip commit of the default branch to determine
+	// the set of LSIF uploads that are visible for each commit, and the set of uploads which are visible at the
+	// tip. The decorated commit graph is serialized to Postgres for use by find closest dumps queries.
+	CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error
 
 	// IndexableRepositories returns the identifiers of all indexable repositories.
 	IndexableRepositories(ctx context.Context, opts IndexableRepositoryQueryOptions) ([]IndexableRepository, error)

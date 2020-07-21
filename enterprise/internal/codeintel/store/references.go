@@ -42,6 +42,7 @@ func (s *store) SameRepoPager(ctx context.Context, repositoryID int, commit, sch
 		return 0, nil, err
 	}
 
+	// TODO - need to update this as well now
 	visibleIDs, err := scanInts(tx.query(
 		ctx,
 		withBidirectionalLineage(`SELECT id FROM visible_ids`, repositoryID, commit),

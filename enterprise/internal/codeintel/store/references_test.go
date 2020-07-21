@@ -34,14 +34,15 @@ func TestSameRepoPager(t *testing.T) {
 	}
 	insertPackageReferences(t, store, expected)
 
-	if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-		makeCommit(1): {},
-		makeCommit(2): {makeCommit(1)},
-		makeCommit(3): {makeCommit(2)},
-		makeCommit(4): {makeCommit(3)},
-	}); err != nil {
-		t.Fatalf("unexpected error updating commits: %s", err)
-	}
+	// TODO - replace
+	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
+	// 	makeCommit(1): {},
+	// 	makeCommit(2): {makeCommit(1)},
+	// 	makeCommit(3): {makeCommit(2)},
+	// 	makeCommit(4): {makeCommit(3)},
+	// }); err != nil {
+	// 	t.Fatalf("unexpected error updating commits: %s", err)
+	// }
 
 	totalCount, pager, err := store.SameRepoPager(context.Background(), 50, makeCommit(1), "gomod", "leftpad", "0.1.0", 5)
 	if err != nil {
@@ -110,11 +111,12 @@ func TestSameRepoPagerMultiplePages(t *testing.T) {
 	}
 	insertPackageReferences(t, store, expected)
 
-	if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-		makeCommit(1): {},
-	}); err != nil {
-		t.Fatalf("unexpected error updating commits: %s", err)
-	}
+	// TODO - replace
+	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
+	// 	makeCommit(1): {},
+	// }); err != nil {
+	// 	t.Fatalf("unexpected error updating commits: %s", err)
+	// }
 
 	totalCount, pager, err := store.SameRepoPager(context.Background(), 50, makeCommit(1), "gomod", "leftpad", "0.1.0", 3)
 	if err != nil {
@@ -165,16 +167,17 @@ func TestSameRepoPagerVisibility(t *testing.T) {
 		{DumpID: 2, Scheme: "gomod", Name: "leftpad", Version: "0.1.0", Filter: []byte("f2")},
 	}, expected...))
 
-	if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-		makeCommit(1): {},
-		makeCommit(2): {makeCommit(1)},
-		makeCommit(3): {makeCommit(2)},
-		makeCommit(4): {makeCommit(3)},
-		makeCommit(5): {makeCommit(4)},
-		makeCommit(6): {makeCommit(5)},
-	}); err != nil {
-		t.Fatalf("unexpected error updating commits: %s", err)
-	}
+	// TODO - replace
+	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
+	// 	makeCommit(1): {},
+	// 	makeCommit(2): {makeCommit(1)},
+	// 	makeCommit(3): {makeCommit(2)},
+	// 	makeCommit(4): {makeCommit(3)},
+	// 	makeCommit(5): {makeCommit(4)},
+	// 	makeCommit(6): {makeCommit(5)},
+	// }); err != nil {
+	// 	t.Fatalf("unexpected error updating commits: %s", err)
+	// }
 
 	totalCount, pager, err := store.SameRepoPager(context.Background(), 50, makeCommit(6), "gomod", "leftpad", "0.1.0", 5)
 	if err != nil {

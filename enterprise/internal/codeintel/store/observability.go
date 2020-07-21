@@ -37,10 +37,10 @@ type ObservedStore struct {
 	sameRepoPagerOperation                  *observation.Operation
 	updatePackageReferencesOperation        *observation.Operation
 	packageReferencePagerOperation          *observation.Operation
+	hasCommitOperation                      *observation.Operation
 	markRepositoryAsDirtyOperation          *observation.Operation
 	dirtyRepositoriesOperation              *observation.Operation
 	fixCommitsOperation                     *observation.Operation
-	hasCommitOperation                      *observation.Operation
 	indexableRepositoriesOperation          *observation.Operation
 	updateIndexableRepositoryOperation      *observation.Operation
 	resetIndexableRepositoriesOperation     *observation.Operation
@@ -193,6 +193,11 @@ func NewObserved(store Store, observationContext *observation.Context) Store {
 			MetricLabels: []string{"package_reference_pager"},
 			Metrics:      metrics,
 		}),
+		hasCommitOperation: observationContext.Operation(observation.Op{
+			Name:         "store.HasCommit",
+			MetricLabels: []string{"has_commit"},
+			Metrics:      metrics,
+		}),
 		markRepositoryAsDirtyOperation: observationContext.Operation(observation.Op{
 			Name:         "store.MarkRepositoryAsDirty",
 			MetricLabels: []string{"mark_repository_as_dirty"},
@@ -206,11 +211,6 @@ func NewObserved(store Store, observationContext *observation.Context) Store {
 		fixCommitsOperation: observationContext.Operation(observation.Op{
 			Name:         "store.FixCommits",
 			MetricLabels: []string{"fix_commits"},
-			Metrics:      metrics,
-		}),
-		hasCommitOperation: observationContext.Operation(observation.Op{
-			Name:         "store.HasCommit",
-			MetricLabels: []string{"has_commit"},
 			Metrics:      metrics,
 		}),
 		indexableRepositoriesOperation: observationContext.Operation(observation.Op{
@@ -333,10 +333,10 @@ func (s *ObservedStore) wrap(other Store) Store {
 		sameRepoPagerOperation:                  s.sameRepoPagerOperation,
 		updatePackageReferencesOperation:        s.updatePackageReferencesOperation,
 		packageReferencePagerOperation:          s.packageReferencePagerOperation,
+		hasCommitOperation:                      s.hasCommitOperation,
 		markRepositoryAsDirtyOperation:          s.markRepositoryAsDirtyOperation,
 		dirtyRepositoriesOperation:              s.dirtyRepositoriesOperation,
 		fixCommitsOperation:                     s.fixCommitsOperation,
-		hasCommitOperation:                      s.hasCommitOperation,
 		indexableRepositoriesOperation:          s.indexableRepositoriesOperation,
 		updateIndexableRepositoryOperation:      s.updateIndexableRepositoryOperation,
 		resetIndexableRepositoriesOperation:     s.resetIndexableRepositoriesOperation,
@@ -566,6 +566,13 @@ func (s *ObservedStore) PackageReferencePager(ctx context.Context, scheme, name,
 	return s.store.PackageReferencePager(ctx, scheme, name, version, repositoryID, limit)
 }
 
+// HasCommit calls into the inner store and registers the observed results.
+func (s *ObservedStore) HasCommit(ctx context.Context, repositoryID int, commit string) (_ bool, err error) {
+	ctx, endObservation := s.hasCommitOperation.With(ctx, &err, observation.Args{})
+	defer endObservation(1, observation.Args{})
+	return s.store.HasCommit(ctx, repositoryID, commit)
+}
+
 // MarkRepositoryAsDirty calls into the inner store and registers the observed results.
 func (s *ObservedStore) MarkRepositoryAsDirty(ctx context.Context, repositoryID int) (err error) {
 	ctx, endObservation := s.markRepositoryAsDirtyOperation.With(ctx, &err, observation.Args{})
@@ -580,18 +587,11 @@ func (s *ObservedStore) DirtyRepositories(ctx context.Context) (repositoryIDs []
 	return s.store.DirtyRepositories(ctx)
 }
 
-// FixCommits calls into the inner store and registers the observed results.
-func (s *ObservedStore) FixCommits(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) (err error) {
+// CalculateVisibleUploads calls into the inner store and registers the observed results.
+func (s *ObservedStore) CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) (err error) {
 	ctx, endObservation := s.fixCommitsOperation.With(ctx, &err, observation.Args{})
 	defer endObservation(1, observation.Args{})
-	return s.store.FixCommits(ctx, repositoryID, graph, tipCommit)
-}
-
-// HasCommit calls into the inner store and registers the observed results.
-func (s *ObservedStore) HasCommit(ctx context.Context, repositoryID int, commit string) (_ bool, err error) {
-	ctx, endObservation := s.hasCommitOperation.With(ctx, &err, observation.Args{})
-	defer endObservation(1, observation.Args{})
-	return s.store.HasCommit(ctx, repositoryID, commit)
+	return s.store.CalculateVisibleUploads(ctx, repositoryID, graph, tipCommit)
 }
 
 // IndexableRepositories calls into the inner store and registers the observed results.

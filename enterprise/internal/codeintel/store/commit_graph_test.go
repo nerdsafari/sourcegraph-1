@@ -23,7 +23,7 @@ var testGraph = map[string][]string{
 	"0ed556d3": {"7cb4a974"},
 }
 
-func TestCalculateReachability(t *testing.T) {
+func TestInternalCalculateVisibleUploads(t *testing.T) {
 	uploads := map[string][]UploadMeta{
 		"e66e8f9b": {{UploadID: 50, Root: "sub1/", Indexer: "lsif-go"}},
 		"f635b8d1": {{UploadID: 52, Root: "sub3/", Indexer: "lsif-go"}},
@@ -34,22 +34,18 @@ func TestCalculateReachability(t *testing.T) {
 		"0ed556d3": {{UploadID: 56, Root: "sub3/", Indexer: "lsif-go"}},
 	}
 
-	commitMeta := map[string]CommitMeta{}
-	for commit, parents := range testGraph {
-		commitMeta[commit] = CommitMeta{
-			Parents: parents,
-			Uploads: uploads[commit],
-		}
+	visibleUploads, err := calculateVisibleUploads(testGraph, uploads)
+	if err != nil {
+		t.Fatalf("unexpected error calculating visible uploads: %s", err)
 	}
 
-	uploadMeta := calculateReachability(commitMeta)
-	for _, uploadMeta := range uploadMeta {
-		sort.Slice(uploadMeta, func(i, j int) bool {
-			return uploadMeta[i].UploadID-uploadMeta[j].UploadID < 0
+	for _, visibleUploads := range visibleUploads {
+		sort.Slice(visibleUploads, func(i, j int) bool {
+			return visibleUploads[i].UploadID-visibleUploads[j].UploadID < 0
 		})
 	}
 
-	expectedUploadMeta := map[string][]UploadMeta{
+	expectedVisibleUploads := map[string][]UploadMeta{
 		"e66e8f9b": {
 			{UploadID: 50, Root: "sub1/", Indexer: "lsif-go", Distance: 0},
 			{UploadID: 51, Root: "sub2/", Indexer: "lsif-go", Distance: 2},
@@ -109,7 +105,7 @@ func TestCalculateReachability(t *testing.T) {
 			{UploadID: 56, Root: "sub3/", Indexer: "lsif-go", Distance: 0},
 		},
 	}
-	if diff := cmp.Diff(expectedUploadMeta, uploadMeta); diff != "" {
+	if diff := cmp.Diff(expectedVisibleUploads, visibleUploads); diff != "" {
 		t.Errorf("unexpected graph (-want +got):\n%s", diff)
 	}
 }
@@ -141,7 +137,10 @@ func TestReverseGraph(t *testing.T) {
 }
 
 func TestTopologicalSort(t *testing.T) {
-	ordering := topologicalSort(testGraph)
+	ordering, err := topologicalSort(testGraph)
+	if err != nil {
+		t.Fatalf("unexpected error sorting graph: %s", err)
+	}
 
 	for commit, parents := range testGraph {
 		i, ok := indexOf(ordering, commit)
@@ -157,10 +156,22 @@ func TestTopologicalSort(t *testing.T) {
 				continue
 			}
 
-			if j < i {
+			if j > i {
 				t.Errorf("commit %s and %s are inverted", commit, parent)
 			}
 		}
+	}
+}
+
+func TestTopologicalSortCycles(t *testing.T) {
+	cyclicTestGraph := map[string][]string{
+		"a": nil,
+		"b": {"c"},
+		"c": {"d"},
+		"d": {"d"},
+	}
+	if _, err := topologicalSort(cyclicTestGraph); err != ErrCyclicCommitGraph {
+		t.Fatalf("unexpected error sorting graph. want=%q have=%q", ErrCyclicCommitGraph, err)
 	}
 }
 

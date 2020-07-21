@@ -8,18 +8,6 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/db/dbtesting"
 )
 
-func TestMarkRepositoryAsDirty(t *testing.T) {
-	// TODO
-}
-
-func TestDirtyRepositories(t *testing.T) {
-	// TODO
-}
-
-func TestFixCommits(t *testing.T) {
-	// TODO
-}
-
 func TestHasCommit(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
@@ -37,11 +25,11 @@ func TestHasCommit(t *testing.T) {
 		{51, makeCommit(1), false},
 	}
 
-	if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-		makeCommit(1): {},
-	}); err != nil {
-		t.Fatalf("unexpected error updating commits: %s", err)
-	}
+	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
+	// 	makeCommit(1): {},
+	// }); err != nil {
+	// 	t.Fatalf("unexpected error updating commits: %s", err)
+	// }
 
 	for _, testCase := range testCases {
 		name := fmt.Sprintf("repositoryID=%d commit=%s", testCase.repositoryID, testCase.commit)
@@ -56,4 +44,16 @@ func TestHasCommit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMarkRepositoryAsDirty(t *testing.T) {
+	// TODO
+}
+
+func TestDirtyRepositories(t *testing.T) {
+	// TODO
+}
+
+func TestCalculateVisibleUploads(t *testing.T) {
+	// TODO
 }
