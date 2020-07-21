@@ -21,7 +21,10 @@ func (api *codeIntelAPI) FindClosestDumps(ctx context.Context, repositoryID int,
 		return nil, errors.Wrap(err, "store.HasCommit")
 	}
 	if !commitExists {
-		// If we are not aware of this commitnot, we need to update our commits table and the
+		// TODO - ensure once we hit the lock that we still care, don't repopulate
+		// things unnecessarily because we got a bursty request for one repository
+
+		// If we are not aware of this commit, we need to update our commits table and the
 		// visibility of the dumps in this repository.
 		if err := api.commitUpdater.Update(ctx, repositoryID, true); err != nil {
 			return nil, errors.Wrap(err, "commitUpdater.Update")
