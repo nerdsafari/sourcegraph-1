@@ -350,6 +350,20 @@ func (s *ObservedStore) wrap(other Store) Store {
 	}
 }
 
+// TODO - rename, move, document, observe
+func (s *ObservedStore) FixCommits(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error {
+	return s.store.FixCommits(ctx, repositoryID, graph, tipCommit)
+}
+func (s *ObservedStore) Lock(ctx context.Context, key int, blocking bool) (bool, UnlockFunc, error) {
+	return s.store.Lock(ctx, key, blocking)
+}
+func (s *ObservedStore) MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error {
+	return s.store.MarkRepositoryAsDirty(ctx, repositoryID)
+}
+func (s *ObservedStore) DirtyRepositories(ctx context.Context) ([]int, error) {
+	return s.store.DirtyRepositories(ctx)
+}
+
 // Handle calls into the inner store and wraps the resulting value in an ObservedStore.
 func (s *ObservedStore) Handle() *basestore.TransactableHandle {
 	return s.store.Handle()

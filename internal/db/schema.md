@@ -349,6 +349,18 @@ Check constraints:
 
 ```
 
+# Table "public.lsif_dirty_repositories"
+```
+     Column      |           Type           | Modifiers 
+-----------------+--------------------------+-----------
+ repository_id   | integer                  | not null
+ dirty           | boolean                  | not null
+ last_updated_at | timestamp with time zone | 
+Indexes:
+    "lsif_dirty_repositories_pkey" PRIMARY KEY, btree (repository_id)
+
+```
+
 # Table "public.lsif_indexable_repositories"
 ```
          Column         |           Type           |                                Modifiers                                 
@@ -384,6 +396,19 @@ Indexes:
     "lsif_indexes_pkey" PRIMARY KEY, btree (id)
 Check constraints:
     "lsif_uploads_commit_valid_chars" CHECK (commit ~ '^[a-z0-9]{40}$'::text)
+
+```
+
+# Table "public.lsif_nearest_uploads"
+```
+    Column     |  Type   | Modifiers 
+---------------+---------+-----------
+ repository_id | integer | not null
+ commit        | text    | not null
+ upload_id     | integer | not null
+ distance      | integer | not null
+Indexes:
+    "lsif_nearest_uploads_repository_id_commit" btree (repository_id, commit)
 
 ```
 

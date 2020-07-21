@@ -84,6 +84,8 @@
 // 1528395690_lsif_upload_size.up.sql (703B)
 // 1528395691_encrypt_tokens.down.sql (128B)
 // 1528395691_encrypt_tokens.up.sql (496B)
+// 1528395692_lsif_denormalize_commits.down.sql (86B)
+// 1528395692_lsif_denormalize_commits.up.sql (443B)
 
 package migrations
 
@@ -1832,6 +1834,46 @@ func _1528395691_encrypt_tokensUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1528395692_lsif_denormalize_commitsDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x72\x75\xf7\xf4\xb3\xe6\xe2\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\xc8\x29\xce\x4c\x8b\xcf\x4b\x4d\x2c\x4a\x2d\x2e\x89\x2f\x2d\xc8\xc9\x4f\x4c\x29\xb6\xc6\x50\x90\x92\x59\x54\x52\x19\x5f\x94\x5a\x90\x5f\x9c\x59\x92\x5f\x94\x99\x5a\x6c\xcd\xc5\xe5\xec\xef\xeb\xeb\x19\x62\xcd\x05\x08\x00\x00\xff\xff\x19\x36\x89\x0f\x56\x00\x00\x00")
+
+func _1528395692_lsif_denormalize_commitsDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1528395692_lsif_denormalize_commitsDownSql,
+		"1528395692_lsif_denormalize_commits.down.sql",
+	)
+}
+
+func _1528395692_lsif_denormalize_commitsDownSql() (*asset, error) {
+	bytes, err := _1528395692_lsif_denormalize_commitsDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1528395692_lsif_denormalize_commits.down.sql", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd2, 0x95, 0x16, 0x9, 0x7a, 0x7e, 0xb7, 0x6d, 0xb8, 0xe7, 0x5b, 0x81, 0x47, 0x1f, 0x43, 0x56, 0x81, 0x68, 0xa2, 0xed, 0x13, 0x19, 0x8c, 0x34, 0xd0, 0xc, 0x5c, 0x73, 0x2a, 0xff, 0x7, 0x52}}
+	return a, nil
+}
+
+var __1528395692_lsif_denormalize_commitsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\x90\x41\x4b\xc3\x40\x14\x84\xef\xf9\x15\x43\x4f\x2d\xf4\x1f\xf4\x94\xea\x22\xc1\x64\x23\x21\x82\x3d\x2d\x6b\xf7\xa9\x0f\x92\xdd\xb0\xfb\x44\xe3\xaf\x17\x12\xb4\xb4\xc6\x1e\x1f\x33\x6f\xf8\x66\xf6\xea\xae\xd0\xbb\x2c\xbb\x69\x54\xde\x2a\xb4\xf9\xbe\x54\xe8\x12\xbf\x18\x4f\x36\x52\x12\xf3\x3e\x74\xc1\xba\x84\x75\x06\x00\x91\x86\x90\x58\x42\x1c\x0d\x3b\xb0\x17\x7a\xa5\x08\x5d\xb7\xd0\x8f\x65\xb9\x9d\x3c\xab\x63\xe8\x7b\x96\x15\x84\x3e\xe5\x42\x9b\xd3\xfe\xff\x75\x9c\xc4\xfa\x23\xfd\x91\xb3\xcd\x89\xb2\xd0\xb7\xea\x69\x91\xd2\x9c\xf1\x99\x19\x04\xb5\x5e\x34\xaf\xcf\xcc\xdb\x5f\xee\xcd\xe2\x1e\x8e\xa3\x8c\xa7\x7c\xa6\xeb\x93\x3c\x34\x45\x95\x37\x07\xdc\xab\xc3\x4f\xb3\x28\x23\x9e\x43\xe8\xc8\xfa\x8b\xd6\x9d\x9d\xa8\x9c\x15\x72\xc6\x0a\x84\x7b\x4a\x62\xfb\x01\x1f\x2c\x6f\xd3\x89\xaf\xe0\x69\x1e\xa1\xae\xaa\xa2\xdd\x65\xdf\x01\x00\x00\xff\xff\x27\x49\xfc\x70\xbb\x01\x00\x00")
+
+func _1528395692_lsif_denormalize_commitsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1528395692_lsif_denormalize_commitsUpSql,
+		"1528395692_lsif_denormalize_commits.up.sql",
+	)
+}
+
+func _1528395692_lsif_denormalize_commitsUpSql() (*asset, error) {
+	bytes, err := _1528395692_lsif_denormalize_commitsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1528395692_lsif_denormalize_commits.up.sql", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa8, 0x47, 0xc2, 0xd1, 0x95, 0x5e, 0x90, 0x7c, 0x74, 0x7e, 0x6, 0xd9, 0xab, 0x24, 0xdc, 0x67, 0xc2, 0x12, 0x81, 0xeb, 0x56, 0x25, 0xfe, 0xb6, 0x68, 0x9, 0x25, 0x64, 0x5b, 0xf4, 0x26, 0xfa}}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -2007,6 +2049,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1528395690_lsif_upload_size.up.sql":                                      _1528395690_lsif_upload_sizeUpSql,
 	"1528395691_encrypt_tokens.down.sql":                                      _1528395691_encrypt_tokensDownSql,
 	"1528395691_encrypt_tokens.up.sql":                                        _1528395691_encrypt_tokensUpSql,
+	"1528395692_lsif_denormalize_commits.down.sql":                            _1528395692_lsif_denormalize_commitsDownSql,
+	"1528395692_lsif_denormalize_commits.up.sql":                              _1528395692_lsif_denormalize_commitsUpSql,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -2137,6 +2181,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1528395690_lsif_upload_size.up.sql":                                      {_1528395690_lsif_upload_sizeUpSql, map[string]*bintree{}},
 	"1528395691_encrypt_tokens.down.sql":                                      {_1528395691_encrypt_tokensDownSql, map[string]*bintree{}},
 	"1528395691_encrypt_tokens.up.sql":                                        {_1528395691_encrypt_tokensUpSql, map[string]*bintree{}},
+	"1528395692_lsif_denormalize_commits.down.sql":                            {_1528395692_lsif_denormalize_commitsDownSql, map[string]*bintree{}},
+	"1528395692_lsif_denormalize_commits.up.sql":                              {_1528395692_lsif_denormalize_commitsUpSql, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

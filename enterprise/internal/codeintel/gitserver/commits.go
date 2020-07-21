@@ -16,6 +16,16 @@ func Head(ctx context.Context, store store.Store, repositoryID int) (string, err
 	return execGitCommand(ctx, store, repositoryID, "rev-parse", "HEAD")
 }
 
+// TODO - document, test
+func AllCommits(ctx context.Context, store store.Store, repositoryID int) (map[string][]string, error) {
+	out, err := execGitCommand(ctx, store, repositoryID, "log", "--all", "--pretty=%H %P")
+	if err != nil {
+		return nil, err
+	}
+
+	return parseCommitsNear(strings.Split(out, "\n")), nil
+}
+
 // CommitsNear returns a map from a commit to parent commits. The commits populating the
 // map are the MaxCommitsPerUpdate closest ancestors from the given commit.
 func CommitsNear(ctx context.Context, store store.Store, repositoryID int, commit string) (map[string][]string, error) {

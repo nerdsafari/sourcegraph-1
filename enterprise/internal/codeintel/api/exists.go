@@ -16,10 +16,16 @@ import (
 // path is a prefix are returned. These dump IDs should be subsequently passed to invocations of
 // Definitions, References, and Hover.
 func (api *codeIntelAPI) FindClosestDumps(ctx context.Context, repositoryID int, commit, path string, exactPath bool, indexer string) ([]store.Dump, error) {
-	// See if we know about this commit. If not, we need to update our commits table
-	// and the visibility of the dumps in this repository.
-	if err := api.updateCommitsAndVisibility(ctx, repositoryID, commit); err != nil {
-		return nil, err
+	commitExists, err := api.store.HasCommit(ctx, repositoryID, commit)
+	if err != nil {
+		return nil, errors.Wrap(err, "store.HasCommit")
+	}
+	if !commitExists {
+		// If we are not aware of this commitnot, we need to update our commits table and the
+		// visibility of the dumps in this repository.
+		if err := api.commitUpdater.Update(ctx, repositoryID, true); err != nil {
+			return nil, errors.Wrap(err, "commitUpdater.Update")
+		}
 	}
 
 	// The parameters exactPath and rootMustEnclosePath align here: if we're looking for dumps
@@ -54,34 +60,4 @@ func (api *codeIntelAPI) FindClosestDumps(ctx context.Context, repositoryID int,
 	}
 
 	return dumps, nil
-}
-
-// updateCommits updates the lsif_commits table with the current data known to gitserver, then updates the
-// visibility of all dumps for the given repository.
-func (api *codeIntelAPI) updateCommitsAndVisibility(ctx context.Context, repositoryID int, commit string) error {
-	commitExists, err := api.store.HasCommit(ctx, repositoryID, commit)
-	if err != nil {
-		return errors.Wrap(err, "store.HasCommit")
-	}
-	if commitExists {
-		return nil
-	}
-
-	newCommits, err := api.gitserverClient.CommitsNear(ctx, api.store, repositoryID, commit)
-	if err != nil {
-		return errors.Wrap(err, "gitserverClient.CommitsNear")
-	}
-	if err := api.store.UpdateCommits(ctx, repositoryID, newCommits); err != nil {
-		return errors.Wrap(err, "store.UpdateCommits")
-	}
-
-	tipCommit, err := api.gitserverClient.Head(ctx, api.store, repositoryID)
-	if err != nil {
-		return errors.Wrap(err, "gitserverClient.Head")
-	}
-	if err := api.store.UpdateDumpsVisibleFromTip(ctx, repositoryID, tipCommit); err != nil {
-		return errors.Wrap(err, "store.UpdateDumpsVisibleFromTip")
-	}
-
-	return nil
 }

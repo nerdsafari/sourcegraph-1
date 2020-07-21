@@ -5,15 +5,18 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/inconshreveable/log15"
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
+	commitupdater "github.com/sourcegraph/sourcegraph/enterprise/cmd/precise-code-intel-worker/internal/commit-updater"
 	"github.com/sourcegraph/sourcegraph/enterprise/cmd/precise-code-intel-worker/internal/metrics"
 	"github.com/sourcegraph/sourcegraph/enterprise/cmd/precise-code-intel-worker/internal/resetter"
 	"github.com/sourcegraph/sourcegraph/enterprise/cmd/precise-code-intel-worker/internal/server"
 	"github.com/sourcegraph/sourcegraph/enterprise/cmd/precise-code-intel-worker/internal/worker"
 	bundles "github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/bundles/client"
+	"github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/commits"
 	"github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/gitserver"
 	"github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/store"
 	"github.com/sourcegraph/sourcegraph/internal/conf"
@@ -54,6 +57,9 @@ func main() {
 	resetterMetrics := resetter.NewResetterMetrics(prometheus.DefaultRegisterer)
 	server := server.New()
 	uploadResetter := resetter.NewUploadResetter(store, resetInterval, resetterMetrics)
+	commitUpdater := commitupdater.NewUpdater(store, commits.NewUpdater(store, gitserver.DefaultClient), commitupdater.UpdaterOptions{
+		Interval: time.Second * 1, // TODO - envvar
+	})
 	worker := worker.NewWorker(
 		store,
 		bundles.New(bundleManagerURL),
@@ -66,6 +72,7 @@ func main() {
 
 	go server.Start()
 	go uploadResetter.Start()
+	go commitUpdater.Start()
 	go worker.Start()
 	go debugserver.Start()
 
@@ -82,6 +89,7 @@ func main() {
 
 	server.Stop()
 	uploadResetter.Stop()
+	commitUpdater.Stop()
 	worker.Stop()
 }
 

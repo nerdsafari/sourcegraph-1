@@ -12,6 +12,12 @@ import (
 
 // Store is the interface to Postgres for precise-code-intel features.
 type Store interface {
+	// TODO - rename, move, document
+	FixCommits(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error
+	Lock(ctx context.Context, key int, blocking bool) (bool, UnlockFunc, error)
+	MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error
+	DirtyRepositories(ctx context.Context) ([]int, error)
+
 	// Handle returns the underlying transactable database handle.
 	Handle() *basestore.TransactableHandle
 
@@ -254,6 +260,11 @@ func scanInts(rows *sql.Rows, queryErr error) (_ []int, err error) {
 // scanFirstInt scans a slice of ints from the return value of `*store.query` and returns the first.
 func scanFirstInt(rows *sql.Rows, err error) (int, bool, error) {
 	return basestore.ScanFirstInt(rows, err)
+}
+
+// scanFirstBool scans a slice of bools from the return value of `*store.query` and returns the first.
+func scanFirstBool(rows *sql.Rows, err error) (bool, bool, error) {
+	return basestore.ScanFirstBool(rows, err)
 }
 
 // closeRows closes the rows object and checks its error value.
