@@ -210,6 +210,43 @@ var UploadMetaComparer = cmp.Comparer(func(x, y UploadMeta) bool {
 	return x.UploadID == y.UploadID && x.Distance == y.Distance
 })
 
+func scanVisibleUploads(rows *sql.Rows, queryErr error) (_ map[string][]UploadMeta, err error) {
+	if queryErr != nil {
+		return nil, queryErr
+	}
+	defer func() { err = closeRows(rows, err) }()
+
+	uploadMeta := map[string][]UploadMeta{}
+	for rows.Next() {
+		var commit string
+		var uploadID int
+		var distance int
+		if err := rows.Scan(&commit, &uploadID, &distance); err != nil {
+			return nil, err
+		}
+
+		uploadMeta[commit] = append(uploadMeta[commit], UploadMeta{
+			UploadID: uploadID,
+			Distance: distance,
+		})
+	}
+
+	return uploadMeta, nil
+}
+
+func getVisibleUploads(t *testing.T, db *sql.DB, repositoryID int) map[string][]UploadMeta {
+	query := sqlf.Sprintf(
+		`SELECT commit, upload_id, distance FROM lsif_nearest_uploads WHERE repository_id = %s ORDER BY upload_id`,
+		repositoryID,
+	)
+	uploads, err := scanVisibleUploads(db.QueryContext(context.Background(), query.Query(sqlf.PostgresBindVar), query.Args()...))
+	if err != nil {
+		t.Fatalf("unexpected error getting visible uploads: %s", err)
+	}
+
+	return uploads
+}
+
 func normalizeVisibleUploads(uploads map[string][]UploadMeta) map[string][]UploadMeta {
 	for _, metas := range uploads {
 		sort.Slice(metas, func(i, j int) bool {
@@ -218,17 +255,4 @@ func normalizeVisibleUploads(uploads map[string][]UploadMeta) map[string][]Uploa
 	}
 
 	return uploads
-}
-
-// unwrapStore gets the underlying store from a store interface value.
-func unwrapStore(s Store) *store {
-	if s, ok := s.(*store); ok {
-		return s
-	}
-
-	if observed, ok := s.(*ObservedStore); ok {
-		return unwrapStore(observed.store)
-	}
-
-	return nil
 }

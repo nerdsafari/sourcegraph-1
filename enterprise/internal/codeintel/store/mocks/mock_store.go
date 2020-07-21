@@ -204,7 +204,7 @@ func NewMockStore() *MockStore {
 			},
 		},
 		DeleteUploadByIDFunc: &StoreDeleteUploadByIDFunc{
-			defaultHook: func(context.Context, int, store.GetTipCommitFunc) (bool, error) {
+			defaultHook: func(context.Context, int) (bool, error) {
 				return false, nil
 			},
 		},
@@ -1245,24 +1245,24 @@ func (c StoreDeleteOverlappingDumpsFuncCall) Results() []interface{} {
 // StoreDeleteUploadByIDFunc describes the behavior when the
 // DeleteUploadByID method of the parent MockStore instance is invoked.
 type StoreDeleteUploadByIDFunc struct {
-	defaultHook func(context.Context, int, store.GetTipCommitFunc) (bool, error)
-	hooks       []func(context.Context, int, store.GetTipCommitFunc) (bool, error)
+	defaultHook func(context.Context, int) (bool, error)
+	hooks       []func(context.Context, int) (bool, error)
 	history     []StoreDeleteUploadByIDFuncCall
 	mutex       sync.Mutex
 }
 
 // DeleteUploadByID delegates to the next hook function in the queue and
 // stores the parameter and result values of this invocation.
-func (m *MockStore) DeleteUploadByID(v0 context.Context, v1 int, v2 store.GetTipCommitFunc) (bool, error) {
-	r0, r1 := m.DeleteUploadByIDFunc.nextHook()(v0, v1, v2)
-	m.DeleteUploadByIDFunc.appendCall(StoreDeleteUploadByIDFuncCall{v0, v1, v2, r0, r1})
+func (m *MockStore) DeleteUploadByID(v0 context.Context, v1 int) (bool, error) {
+	r0, r1 := m.DeleteUploadByIDFunc.nextHook()(v0, v1)
+	m.DeleteUploadByIDFunc.appendCall(StoreDeleteUploadByIDFuncCall{v0, v1, r0, r1})
 	return r0, r1
 }
 
 // SetDefaultHook sets function that is called when the DeleteUploadByID
 // method of the parent MockStore instance is invoked and the hook queue is
 // empty.
-func (f *StoreDeleteUploadByIDFunc) SetDefaultHook(hook func(context.Context, int, store.GetTipCommitFunc) (bool, error)) {
+func (f *StoreDeleteUploadByIDFunc) SetDefaultHook(hook func(context.Context, int) (bool, error)) {
 	f.defaultHook = hook
 }
 
@@ -1270,7 +1270,7 @@ func (f *StoreDeleteUploadByIDFunc) SetDefaultHook(hook func(context.Context, in
 // DeleteUploadByID method of the parent MockStore instance inovkes the hook
 // at the front of the queue and discards it. After the queue is empty, the
 // default hook function is invoked for any future action.
-func (f *StoreDeleteUploadByIDFunc) PushHook(hook func(context.Context, int, store.GetTipCommitFunc) (bool, error)) {
+func (f *StoreDeleteUploadByIDFunc) PushHook(hook func(context.Context, int) (bool, error)) {
 	f.mutex.Lock()
 	f.hooks = append(f.hooks, hook)
 	f.mutex.Unlock()
@@ -1279,7 +1279,7 @@ func (f *StoreDeleteUploadByIDFunc) PushHook(hook func(context.Context, int, sto
 // SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
 // the given values.
 func (f *StoreDeleteUploadByIDFunc) SetDefaultReturn(r0 bool, r1 error) {
-	f.SetDefaultHook(func(context.Context, int, store.GetTipCommitFunc) (bool, error) {
+	f.SetDefaultHook(func(context.Context, int) (bool, error) {
 		return r0, r1
 	})
 }
@@ -1287,12 +1287,12 @@ func (f *StoreDeleteUploadByIDFunc) SetDefaultReturn(r0 bool, r1 error) {
 // PushReturn calls PushDefaultHook with a function that returns the given
 // values.
 func (f *StoreDeleteUploadByIDFunc) PushReturn(r0 bool, r1 error) {
-	f.PushHook(func(context.Context, int, store.GetTipCommitFunc) (bool, error) {
+	f.PushHook(func(context.Context, int) (bool, error) {
 		return r0, r1
 	})
 }
 
-func (f *StoreDeleteUploadByIDFunc) nextHook() func(context.Context, int, store.GetTipCommitFunc) (bool, error) {
+func (f *StoreDeleteUploadByIDFunc) nextHook() func(context.Context, int) (bool, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -1331,9 +1331,6 @@ type StoreDeleteUploadByIDFuncCall struct {
 	// Arg1 is the value of the 2nd argument passed to this method
 	// invocation.
 	Arg1 int
-	// Arg2 is the value of the 3rd argument passed to this method
-	// invocation.
-	Arg2 store.GetTipCommitFunc
 	// Result0 is the value of the 1st result returned from this method
 	// invocation.
 	Result0 bool
@@ -1345,7 +1342,7 @@ type StoreDeleteUploadByIDFuncCall struct {
 // Args returns an interface slice containing the arguments of this
 // invocation.
 func (c StoreDeleteUploadByIDFuncCall) Args() []interface{} {
-	return []interface{}{c.Arg0, c.Arg1, c.Arg2}
+	return []interface{}{c.Arg0, c.Arg1}
 }
 
 // Results returns an interface slice containing the results of this

@@ -73,6 +73,8 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 	}
 	defer func() { err = tx.Done(err) }()
 
+	// Pull all upload metadata known to this repository so we can correlate it
+	// with the current commit graph.
 	uploadMeta, err := scanUploadMeta(tx.query(ctx, sqlf.Sprintf(`
 		SELECT id, commit, root, indexer
 		FROM lsif_uploads
@@ -82,8 +84,14 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 		return err
 	}
 
+	// Determine which uploads are visible to which commits for this repository
 	visibleUploads, err := calculateVisibleUploads(graph, uploadMeta)
 	if err != nil {
+		return err
+	}
+
+	// Clear all old visibility data for this repository
+	if err := tx.queryForEffect(ctx, sqlf.Sprintf(`DELETE FROM lsif_nearest_uploads WHERE repository_id = %s`, repositoryID)); err != nil {
 		return err
 	}
 
@@ -91,17 +99,8 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 	for _, uploads := range visibleUploads {
 		n += len(uploads)
 	}
-
-	var ids []*sqlf.Query
-	for _, uploadMeta := range visibleUploads[tipCommit] {
-		ids = append(ids, sqlf.Sprintf("%s", uploadMeta.UploadID))
-	}
-
-	if err := tx.queryForEffect(ctx, sqlf.Sprintf(`DELETE FROM lsif_nearest_uploads WHERE repository_id = %s`, repositoryID)); err != nil {
-		return err
-	}
-
 	rows := make([]*sqlf.Query, 0, n)
+
 	for commit, uploads := range visibleUploads {
 		for _, uploadMeta := range uploads {
 			rows = append(rows, sqlf.Sprintf(
@@ -114,24 +113,10 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 		}
 	}
 
-	// TODO - extract
-	batch := func(queries []*sqlf.Query, n int) [][]*sqlf.Query {
-		batchSize := 65535 / n // TODO - define a constant
-
-		var batches [][]*sqlf.Query
-		for len(queries) > 0 {
-			if len(queries) > batchSize {
-				batches = append(batches, queries[:batchSize])
-				queries = queries[batchSize:]
-			} else {
-				batches = append(batches, queries)
-			}
-		}
-
-		return batches
-	}
-
-	for _, batch := range batch(rows, 4) {
+	// Insert new data for this repository in batches - it's likely we'll exceed the
+	// maximum number of placeholders per query so we need to break it into several
+	// queries below this size.
+	for _, batch := range batchQueries(rows, MaxPostgresNumParameters/4) {
 		if err := tx.queryForEffect(ctx, sqlf.Sprintf(
 			`INSERT INTO lsif_nearest_uploads (repository_id, "commit", upload_id, distance) VALUES %s`,
 			sqlf.Join(batch, ","),
@@ -140,19 +125,32 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 		}
 	}
 
-	//
-	// TODO - maybe don't store this directly in the table?
-	//
+	var ids []*sqlf.Query
+	for _, uploadMeta := range visibleUploads[tipCommit] {
+		ids = append(ids, sqlf.Sprintf("%s", uploadMeta.UploadID))
+	}
 
+	var setCond *sqlf.Query
+	if len(ids) == 0 {
+		setCond = sqlf.Sprintf("false")
+	} else {
+		setCond = sqlf.Sprintf(`(id IN (%s))`, sqlf.Join(ids, ","))
+	}
+
+	// TODO - store this in an external table
+	// Update which repositories are visible from the tip of the default branch. This
+	// flag is used to determine which bundles for a repository we open during a global
+	// find references query.
 	if err := tx.queryForEffect(ctx, sqlf.Sprintf(
-		`UPDATE lsif_uploads SET visible_at_tip = (id IN (%s)) WHERE repository_id = %s`,
-		sqlf.Join(ids, ","), // TODO - syntax error if empty, I think
+		`UPDATE lsif_uploads SET visible_at_tip = %s WHERE repository_id = %s`,
+		setCond,
 		repositoryID,
 	)); err != nil {
 		return err
 	}
 
-	// TODO - only do this if some token matches
+	// TODO - ensure some token matches
+	// We just updated the repository commit graph so we can clear its dirty flag.
 	if err := tx.queryForEffect(
 		ctx,
 		sqlf.Sprintf(`
@@ -165,4 +163,22 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 	}
 
 	return nil
+}
+
+// TODO - document
+const MaxPostgresNumParameters = 65535
+
+// TODO - document, test
+func batchQueries(queries []*sqlf.Query, batchSize int) (batches [][]*sqlf.Query) {
+	for len(queries) > 0 {
+		if len(queries) > batchSize {
+			batches = append(batches, queries[:batchSize])
+			queries = queries[batchSize:]
+		} else {
+			batches = append(batches, queries)
+			queries = nil
+		}
+	}
+
+	return batches
 }
