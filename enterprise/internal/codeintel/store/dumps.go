@@ -134,22 +134,6 @@ func (s *store) FindClosestDumps(ctx context.Context, repositoryID int, commit, 
 	))
 }
 
-// deduplicateDumps returns a copy of the given slice of dumps with duplicate identifiers removed.
-// The first dump with a unique identifier is retained.
-func deduplicateDumps(allDumps []Dump) (dumps []Dump) {
-	dumpIDs := map[int]struct{}{}
-	for _, dump := range allDumps {
-		if _, ok := dumpIDs[dump.ID]; ok {
-			continue
-		}
-
-		dumpIDs[dump.ID] = struct{}{}
-		dumps = append(dumps, dump)
-	}
-
-	return dumps
-}
-
 // DeleteOldestDump deletes the oldest dump that is not currently visible at the tip of its repository's default branch.
 // This method returns the deleted dump's identifier and a flag indicating its (previous) existence.
 func (s *store) DeleteOldestDump(ctx context.Context) (int, bool, error) {
@@ -162,15 +146,6 @@ func (s *store) DeleteOldestDump(ctx context.Context) (int, bool, error) {
 			LIMIT 1
 		) RETURNING id
 	`)))
-}
-
-// UpdateDumpsVisibleFromTip recalculates the visible_at_tip flag of all dumps of the given repository.
-func (s *store) UpdateDumpsVisibleFromTip(ctx context.Context, repositoryID int, tipCommit string) (err error) {
-	return s.queryForEffect(ctx, withAncestorLineage(`
-		UPDATE lsif_uploads d
-		SET visible_at_tip = id IN (SELECT * from visible_ids)
-		WHERE d.repository_id = %s AND (d.id IN (SELECT * from visible_ids) OR d.visible_at_tip)
-	`, repositoryID, tipCommit, repositoryID))
 }
 
 // DeleteOverlapapingDumps deletes all completed uploads for the given repository with the same

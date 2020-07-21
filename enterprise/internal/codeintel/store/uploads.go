@@ -7,7 +7,6 @@ import (
 
 	"github.com/keegancsmith/sqlf"
 	"github.com/lib/pq"
-	"github.com/pkg/errors"
 	"github.com/sourcegraph/sourcegraph/internal/workerutil"
 )
 
@@ -124,26 +123,26 @@ func scanStates(rows *sql.Rows, queryErr error) (_ map[int]string, err error) {
 	return states, nil
 }
 
-// scanVisibility scans pairs of id/visibleAtTip from the return value of `*store.query`.
-func scanVisibilities(rows *sql.Rows, queryErr error) (_ map[int]bool, err error) {
-	if queryErr != nil {
-		return nil, queryErr
-	}
-	defer func() { err = closeRows(rows, err) }()
+// // scanVisibility scans pairs of id/visibleAtTip from the return value of `*store.query`.
+// func scanVisibilities(rows *sql.Rows, queryErr error) (_ map[int]bool, err error) {
+// 	if queryErr != nil {
+// 		return nil, queryErr
+// 	}
+// 	defer func() { err = closeRows(rows, err) }()
 
-	visibilities := map[int]bool{}
-	for rows.Next() {
-		var id int
-		var visibleAtTip bool
-		if err := rows.Scan(&id, &visibleAtTip); err != nil {
-			return nil, err
-		}
+// 	visibilities := map[int]bool{}
+// 	for rows.Next() {
+// 		var id int
+// 		var visibleAtTip bool
+// 		if err := rows.Scan(&id, &visibleAtTip); err != nil {
+// 			return nil, err
+// 		}
 
-		visibilities[id] = visibleAtTip
-	}
+// 		visibilities[id] = visibleAtTip
+// 	}
 
-	return visibilities, nil
-}
+// 	return visibilities, nil
+// }
 
 // scanCounts scans pairs of id/counts from the return value of `*store.query`.
 func scanCounts(rows *sql.Rows, queryErr error) (_ map[int]int, err error) {
@@ -441,31 +440,24 @@ func (s *store) DeleteUploadByID(ctx context.Context, id int, getTipCommit GetTi
 	}
 	defer func() { err = tx.Done(err) }()
 
-	visibilities, err := scanVisibilities(tx.query(
+	// TODO - can select distinct?
+	repositoryIDs, err := scanInts(tx.query(
 		ctx,
 		sqlf.Sprintf(`
 			DELETE FROM lsif_uploads
 			WHERE id = %s
-			RETURNING repository_id, visible_at_tip
+			RETURNING repository_id
 		`, id),
 	))
 	if err != nil {
 		return false, err
 	}
 
-	for repositoryID, visibleAtTip := range visibilities {
-		if visibleAtTip {
-			tipCommit, err := getTipCommit(ctx, repositoryID)
-			if err != nil {
-				return false, err
-			}
-
-			if err := tx.UpdateDumpsVisibleFromTip(ctx, repositoryID, tipCommit); err != nil {
-				return false, errors.Wrap(err, "store.UpdateDumpsVisibleFromTip")
-			}
+	// TODO - do in one statement
+	for _, repositoryID := range repositoryIDs {
+		if err := tx.MarkRepositoryAsDirty(ctx, repositoryID); err != nil {
+			return false, err
 		}
-
-		return true, nil
 	}
 
 	return false, nil

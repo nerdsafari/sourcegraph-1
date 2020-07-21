@@ -7,13 +7,15 @@ import (
 	"github.com/keegancsmith/sqlf"
 )
 
-// TODO - document, choose better value
-const appLockKey = 1330
+// appLockKey is the namespace in which all advisory locks are taken.
+const appLockKey = 176380398
 
-// TODO - document
+// UnlockFunc unlocks the advisory lock taken by a successful call to Lock. If an error
+// occurs during unlock, the error is added to the resulting error value.
 type UnlockFunc func(err error) error
 
-// TODO - document, test
+// Lock attempts to take an advisory lock on the given key. If successful, this method will
+// return a true-valued flag along with a function that must be called to release the lock.
 func (s *store) Lock(ctx context.Context, key int, blocking bool) (locked bool, _ UnlockFunc, err error) {
 	if blocking {
 		locked, err = s.lock(ctx, key)
@@ -36,7 +38,7 @@ func (s *store) Lock(ctx context.Context, key int, blocking bool) (locked bool, 
 	return true, unlock, nil
 }
 
-// TODO - document
+// lock blocks until an advisory lock is taken on the given key.
 func (s *store) lock(ctx context.Context, key int) (bool, error) {
 	err := s.queryForEffect(ctx, sqlf.Sprintf(`SELECT pg_advisory_lock(%s, %s)`, appLockKey, key))
 	if err != nil {
@@ -45,7 +47,8 @@ func (s *store) lock(ctx context.Context, key int) (bool, error) {
 	return true, nil
 }
 
-// TODO - document
+// tryLock attempts to tak ean advisory lock on the given key. Returns true on
+// success and false on failure.
 func (s *store) tryLock(ctx context.Context, key int) (bool, error) {
 	ok, _, err := scanFirstBool(s.query(ctx, sqlf.Sprintf(`SELECT pg_try_advisory_lock(%s, %s)`, appLockKey, key)))
 	if err != nil || !ok {
@@ -54,7 +57,7 @@ func (s *store) tryLock(ctx context.Context, key int) (bool, error) {
 	return true, nil
 }
 
-// TODO - document
+// unlock releases the advisory lock on the given key.
 func (s *store) unlock(key int) error {
 	err := s.queryForEffect(context.Background(), sqlf.Sprintf(`SELECT pg_advisory_unlock(%s, %s)`, appLockKey, key))
 	return err

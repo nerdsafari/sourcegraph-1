@@ -12,12 +12,6 @@ import (
 
 // Store is the interface to Postgres for precise-code-intel features.
 type Store interface {
-	// TODO - rename, move, document
-	FixCommits(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error
-	Lock(ctx context.Context, key int, blocking bool) (bool, UnlockFunc, error)
-	MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error
-	DirtyRepositories(ctx context.Context) ([]int, error)
-
 	// Handle returns the underlying transactable database handle.
 	Handle() *basestore.TransactableHandle
 
@@ -34,6 +28,9 @@ type Store interface {
 	// is added to the resulting error value. If the store does not wrap a transaction the
 	// original error value is returned unchanged.
 	Done(err error) error
+
+	// TODO - rename, document
+	Lock(ctx context.Context, key int, blocking bool) (bool, UnlockFunc, error)
 
 	// GetUploadByID returns an upload by its identifier and boolean flag indicating its existence.
 	GetUploadByID(ctx context.Context, id int) (Upload, bool, error)
@@ -100,9 +97,6 @@ type Store interface {
 	// This method returns the deleted dump's identifier and a flag indicating its (previous) existence.
 	DeleteOldestDump(ctx context.Context) (int, bool, error)
 
-	// UpdateDumpsVisibleFromTip recalculates the visible_at_tip flag of all dumps of the given repository.
-	UpdateDumpsVisibleFromTip(ctx context.Context, repositoryID int, tipCommit string) error
-
 	// DeleteOverlapapingDumps deletes all completed uploads for the given repository with the same
 	// commit, root, and indexer. This is necessary to perform during conversions before changing
 	// the state of a processing upload to completed as there is a unique index on these four columns.
@@ -126,11 +120,17 @@ type Store interface {
 	// default branch.
 	PackageReferencePager(ctx context.Context, scheme, name, version string, repositoryID, limit int) (int, ReferencePager, error)
 
+	// TODO - document
+	MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error
+
+	// TODO - document
+	DirtyRepositories(ctx context.Context) ([]int, error)
+
+	// TODO - document
+	FixCommits(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error
+
 	// HasCommit determines if the given commit is known for the given repository.
 	HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error)
-
-	// UpdateCommits upserts commits/parent-commit relations for the given repository ID.
-	UpdateCommits(ctx context.Context, repositoryID int, commits map[string][]string) error
 
 	// IndexableRepositories returns the identifiers of all indexable repositories.
 	IndexableRepositories(ctx context.Context, opts IndexableRepositoryQueryOptions) ([]IndexableRepository, error)

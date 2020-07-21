@@ -190,6 +190,7 @@ func (p *processor) updateXrepoData(ctx context.Context, store store.Store, uplo
 		return errors.Wrap(err, "store.UpdatePackageReferences")
 	}
 
+	// TODO - this deadlocks, need to rearrange things
 	// Before we mark the upload as complete, we need to delete any existing completed uploads
 	// that have the same repository_id, commit, root, and indexer values. Otherwise the transaction
 	// will fail as these values form a unique constraint.
