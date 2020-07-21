@@ -15,12 +15,12 @@ import (
 // github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/gitserver)
 // used for unit testing.
 type MockClient struct {
-	// AllCommitsFunc is an instance of a mock function object controlling
-	// the behavior of the method AllCommits.
-	AllCommitsFunc *ClientAllCommitsFunc
 	// ArchiveFunc is an instance of a mock function object controlling the
 	// behavior of the method Archive.
 	ArchiveFunc *ClientArchiveFunc
+	// CommitGraphFunc is an instance of a mock function object controlling
+	// the behavior of the method CommitGraph.
+	CommitGraphFunc *ClientCommitGraphFunc
 	// DirectoryChildrenFunc is an instance of a mock function object
 	// controlling the behavior of the method DirectoryChildren.
 	DirectoryChildrenFunc *ClientDirectoryChildrenFunc
@@ -39,13 +39,13 @@ type MockClient struct {
 // return zero values for all results, unless overwritten.
 func NewMockClient() *MockClient {
 	return &MockClient{
-		AllCommitsFunc: &ClientAllCommitsFunc{
-			defaultHook: func(context.Context, store.Store, int) (map[string][]string, error) {
+		ArchiveFunc: &ClientArchiveFunc{
+			defaultHook: func(context.Context, store.Store, int, string) (io.Reader, error) {
 				return nil, nil
 			},
 		},
-		ArchiveFunc: &ClientArchiveFunc{
-			defaultHook: func(context.Context, store.Store, int, string) (io.Reader, error) {
+		CommitGraphFunc: &ClientCommitGraphFunc{
+			defaultHook: func(context.Context, store.Store, int) (map[string][]string, error) {
 				return nil, nil
 			},
 		},
@@ -76,11 +76,11 @@ func NewMockClient() *MockClient {
 // methods delegate to the given implementation, unless overwritten.
 func NewMockClientFrom(i gitserver.Client) *MockClient {
 	return &MockClient{
-		AllCommitsFunc: &ClientAllCommitsFunc{
-			defaultHook: i.AllCommits,
-		},
 		ArchiveFunc: &ClientArchiveFunc{
 			defaultHook: i.Archive,
+		},
+		CommitGraphFunc: &ClientCommitGraphFunc{
+			defaultHook: i.CommitGraph,
 		},
 		DirectoryChildrenFunc: &ClientDirectoryChildrenFunc{
 			defaultHook: i.DirectoryChildren,
@@ -95,117 +95,6 @@ func NewMockClientFrom(i gitserver.Client) *MockClient {
 			defaultHook: i.Tags,
 		},
 	}
-}
-
-// ClientAllCommitsFunc describes the behavior when the AllCommits method of
-// the parent MockClient instance is invoked.
-type ClientAllCommitsFunc struct {
-	defaultHook func(context.Context, store.Store, int) (map[string][]string, error)
-	hooks       []func(context.Context, store.Store, int) (map[string][]string, error)
-	history     []ClientAllCommitsFuncCall
-	mutex       sync.Mutex
-}
-
-// AllCommits delegates to the next hook function in the queue and stores
-// the parameter and result values of this invocation.
-func (m *MockClient) AllCommits(v0 context.Context, v1 store.Store, v2 int) (map[string][]string, error) {
-	r0, r1 := m.AllCommitsFunc.nextHook()(v0, v1, v2)
-	m.AllCommitsFunc.appendCall(ClientAllCommitsFuncCall{v0, v1, v2, r0, r1})
-	return r0, r1
-}
-
-// SetDefaultHook sets function that is called when the AllCommits method of
-// the parent MockClient instance is invoked and the hook queue is empty.
-func (f *ClientAllCommitsFunc) SetDefaultHook(hook func(context.Context, store.Store, int) (map[string][]string, error)) {
-	f.defaultHook = hook
-}
-
-// PushHook adds a function to the end of hook queue. Each invocation of the
-// AllCommits method of the parent MockClient instance inovkes the hook at
-// the front of the queue and discards it. After the queue is empty, the
-// default hook function is invoked for any future action.
-func (f *ClientAllCommitsFunc) PushHook(hook func(context.Context, store.Store, int) (map[string][]string, error)) {
-	f.mutex.Lock()
-	f.hooks = append(f.hooks, hook)
-	f.mutex.Unlock()
-}
-
-// SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
-// the given values.
-func (f *ClientAllCommitsFunc) SetDefaultReturn(r0 map[string][]string, r1 error) {
-	f.SetDefaultHook(func(context.Context, store.Store, int) (map[string][]string, error) {
-		return r0, r1
-	})
-}
-
-// PushReturn calls PushDefaultHook with a function that returns the given
-// values.
-func (f *ClientAllCommitsFunc) PushReturn(r0 map[string][]string, r1 error) {
-	f.PushHook(func(context.Context, store.Store, int) (map[string][]string, error) {
-		return r0, r1
-	})
-}
-
-func (f *ClientAllCommitsFunc) nextHook() func(context.Context, store.Store, int) (map[string][]string, error) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	if len(f.hooks) == 0 {
-		return f.defaultHook
-	}
-
-	hook := f.hooks[0]
-	f.hooks = f.hooks[1:]
-	return hook
-}
-
-func (f *ClientAllCommitsFunc) appendCall(r0 ClientAllCommitsFuncCall) {
-	f.mutex.Lock()
-	f.history = append(f.history, r0)
-	f.mutex.Unlock()
-}
-
-// History returns a sequence of ClientAllCommitsFuncCall objects describing
-// the invocations of this function.
-func (f *ClientAllCommitsFunc) History() []ClientAllCommitsFuncCall {
-	f.mutex.Lock()
-	history := make([]ClientAllCommitsFuncCall, len(f.history))
-	copy(history, f.history)
-	f.mutex.Unlock()
-
-	return history
-}
-
-// ClientAllCommitsFuncCall is an object that describes an invocation of
-// method AllCommits on an instance of MockClient.
-type ClientAllCommitsFuncCall struct {
-	// Arg0 is the value of the 1st argument passed to this method
-	// invocation.
-	Arg0 context.Context
-	// Arg1 is the value of the 2nd argument passed to this method
-	// invocation.
-	Arg1 store.Store
-	// Arg2 is the value of the 3rd argument passed to this method
-	// invocation.
-	Arg2 int
-	// Result0 is the value of the 1st result returned from this method
-	// invocation.
-	Result0 map[string][]string
-	// Result1 is the value of the 2nd result returned from this method
-	// invocation.
-	Result1 error
-}
-
-// Args returns an interface slice containing the arguments of this
-// invocation.
-func (c ClientAllCommitsFuncCall) Args() []interface{} {
-	return []interface{}{c.Arg0, c.Arg1, c.Arg2}
-}
-
-// Results returns an interface slice containing the results of this
-// invocation.
-func (c ClientAllCommitsFuncCall) Results() []interface{} {
-	return []interface{}{c.Result0, c.Result1}
 }
 
 // ClientArchiveFunc describes the behavior when the Archive method of the
@@ -319,6 +208,117 @@ func (c ClientArchiveFuncCall) Args() []interface{} {
 // Results returns an interface slice containing the results of this
 // invocation.
 func (c ClientArchiveFuncCall) Results() []interface{} {
+	return []interface{}{c.Result0, c.Result1}
+}
+
+// ClientCommitGraphFunc describes the behavior when the CommitGraph method
+// of the parent MockClient instance is invoked.
+type ClientCommitGraphFunc struct {
+	defaultHook func(context.Context, store.Store, int) (map[string][]string, error)
+	hooks       []func(context.Context, store.Store, int) (map[string][]string, error)
+	history     []ClientCommitGraphFuncCall
+	mutex       sync.Mutex
+}
+
+// CommitGraph delegates to the next hook function in the queue and stores
+// the parameter and result values of this invocation.
+func (m *MockClient) CommitGraph(v0 context.Context, v1 store.Store, v2 int) (map[string][]string, error) {
+	r0, r1 := m.CommitGraphFunc.nextHook()(v0, v1, v2)
+	m.CommitGraphFunc.appendCall(ClientCommitGraphFuncCall{v0, v1, v2, r0, r1})
+	return r0, r1
+}
+
+// SetDefaultHook sets function that is called when the CommitGraph method
+// of the parent MockClient instance is invoked and the hook queue is empty.
+func (f *ClientCommitGraphFunc) SetDefaultHook(hook func(context.Context, store.Store, int) (map[string][]string, error)) {
+	f.defaultHook = hook
+}
+
+// PushHook adds a function to the end of hook queue. Each invocation of the
+// CommitGraph method of the parent MockClient instance inovkes the hook at
+// the front of the queue and discards it. After the queue is empty, the
+// default hook function is invoked for any future action.
+func (f *ClientCommitGraphFunc) PushHook(hook func(context.Context, store.Store, int) (map[string][]string, error)) {
+	f.mutex.Lock()
+	f.hooks = append(f.hooks, hook)
+	f.mutex.Unlock()
+}
+
+// SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
+// the given values.
+func (f *ClientCommitGraphFunc) SetDefaultReturn(r0 map[string][]string, r1 error) {
+	f.SetDefaultHook(func(context.Context, store.Store, int) (map[string][]string, error) {
+		return r0, r1
+	})
+}
+
+// PushReturn calls PushDefaultHook with a function that returns the given
+// values.
+func (f *ClientCommitGraphFunc) PushReturn(r0 map[string][]string, r1 error) {
+	f.PushHook(func(context.Context, store.Store, int) (map[string][]string, error) {
+		return r0, r1
+	})
+}
+
+func (f *ClientCommitGraphFunc) nextHook() func(context.Context, store.Store, int) (map[string][]string, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	if len(f.hooks) == 0 {
+		return f.defaultHook
+	}
+
+	hook := f.hooks[0]
+	f.hooks = f.hooks[1:]
+	return hook
+}
+
+func (f *ClientCommitGraphFunc) appendCall(r0 ClientCommitGraphFuncCall) {
+	f.mutex.Lock()
+	f.history = append(f.history, r0)
+	f.mutex.Unlock()
+}
+
+// History returns a sequence of ClientCommitGraphFuncCall objects
+// describing the invocations of this function.
+func (f *ClientCommitGraphFunc) History() []ClientCommitGraphFuncCall {
+	f.mutex.Lock()
+	history := make([]ClientCommitGraphFuncCall, len(f.history))
+	copy(history, f.history)
+	f.mutex.Unlock()
+
+	return history
+}
+
+// ClientCommitGraphFuncCall is an object that describes an invocation of
+// method CommitGraph on an instance of MockClient.
+type ClientCommitGraphFuncCall struct {
+	// Arg0 is the value of the 1st argument passed to this method
+	// invocation.
+	Arg0 context.Context
+	// Arg1 is the value of the 2nd argument passed to this method
+	// invocation.
+	Arg1 store.Store
+	// Arg2 is the value of the 3rd argument passed to this method
+	// invocation.
+	Arg2 int
+	// Result0 is the value of the 1st result returned from this method
+	// invocation.
+	Result0 map[string][]string
+	// Result1 is the value of the 2nd result returned from this method
+	// invocation.
+	Result1 error
+}
+
+// Args returns an interface slice containing the arguments of this
+// invocation.
+func (c ClientCommitGraphFuncCall) Args() []interface{} {
+	return []interface{}{c.Arg0, c.Arg1, c.Arg2}
+}
+
+// Results returns an interface slice containing the results of this
+// invocation.
+func (c ClientCommitGraphFuncCall) Results() []interface{} {
 	return []interface{}{c.Result0, c.Result1}
 }
 

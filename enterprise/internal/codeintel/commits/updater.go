@@ -45,9 +45,9 @@ func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool) (
 		err = unlock(err)
 	}()
 
-	graph, err := u.gitserverClient.AllCommits(context.Background(), u.store, repositoryID)
+	graph, err := u.gitserverClient.CommitGraph(context.Background(), u.store, repositoryID)
 	if err != nil {
-		return errors.Wrap(err, "gitserver.AllCommits")
+		return errors.Wrap(err, "gitserver.CommitGraph")
 	}
 
 	tipCommit, err := u.gitserverClient.Head(context.Background(), u.store, repositoryID)

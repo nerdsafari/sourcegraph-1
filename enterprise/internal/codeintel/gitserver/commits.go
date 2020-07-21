@@ -12,9 +12,9 @@ func Head(ctx context.Context, store store.Store, repositoryID int) (string, err
 	return execGitCommand(ctx, store, repositoryID, "rev-parse", "HEAD")
 }
 
-// AllCommits returns the commit graph for the given repository as a mapping from a commit
+// CommitGraph returns the commit graph for the given repository as a mapping from a commit
 // to its parents.
-func AllCommits(ctx context.Context, store store.Store, repositoryID int) (map[string][]string, error) {
+func CommitGraph(ctx context.Context, store store.Store, repositoryID int) (map[string][]string, error) {
 	out, err := execGitCommand(ctx, store, repositoryID, "log", "--all", "--pretty=%H %P")
 	if err != nil {
 		return nil, err

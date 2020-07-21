@@ -13,8 +13,9 @@ type Client interface {
 	// Head determines the tip commit of the default branch for the given repository.
 	Head(ctx context.Context, store store.Store, repositoryID int) (string, error)
 
-	// TODO - document, test, move
-	AllCommits(ctx context.Context, store store.Store, repositoryID int) (map[string][]string, error)
+	// CommitGraph returns the commit graph for the given repository as a mapping from a commit
+	// to its parents.
+	CommitGraph(ctx context.Context, store store.Store, repositoryID int) (map[string][]string, error)
 
 	// DirectoryChildren determines all children known to git for the given directory names via an invocation
 	// of git ls-tree. The keys of the resulting map are the input (unsanitized) dirnames, and the value of
@@ -41,8 +42,8 @@ func (c *defaultClient) Head(ctx context.Context, store store.Store, repositoryI
 	return Head(ctx, store, repositoryID)
 }
 
-func (c *defaultClient) AllCommits(ctx context.Context, store store.Store, repositoryID int) (map[string][]string, error) {
-	return AllCommits(ctx, store, repositoryID)
+func (c *defaultClient) CommitGraph(ctx context.Context, store store.Store, repositoryID int) (map[string][]string, error) {
+	return CommitGraph(ctx, store, repositoryID)
 }
 
 func (c *defaultClient) DirectoryChildren(ctx context.Context, store store.Store, repositoryID int, commit string, dirnames []string) (map[string][]string, error) {

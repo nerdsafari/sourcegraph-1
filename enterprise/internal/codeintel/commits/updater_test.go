@@ -25,7 +25,7 @@ func TestUpdate(t *testing.T) {
 	mockStore.LockFunc.SetDefaultReturn(true, unlock, nil)
 
 	mockGitserverClient := gitservermocks.NewMockClient()
-	mockGitserverClient.AllCommitsFunc.SetDefaultReturn(graph, nil)
+	mockGitserverClient.CommitGraphFunc.SetDefaultReturn(graph, nil)
 	mockGitserverClient.HeadFunc.SetDefaultReturn("b", nil)
 
 	if err := NewUpdater(mockStore, mockGitserverClient).Update(context.Background(), 42, true); err != nil {
@@ -73,7 +73,7 @@ func TestUpdateNoLock(t *testing.T) {
 	mockStore.LockFunc.SetDefaultReturn(false, nil, nil)
 
 	mockGitserverClient := gitservermocks.NewMockClient()
-	mockGitserverClient.AllCommitsFunc.SetDefaultReturn(graph, nil)
+	mockGitserverClient.CommitGraphFunc.SetDefaultReturn(graph, nil)
 	mockGitserverClient.HeadFunc.SetDefaultReturn("b", nil)
 
 	if err := NewUpdater(mockStore, mockGitserverClient).Update(context.Background(), 42, false); err != nil {
