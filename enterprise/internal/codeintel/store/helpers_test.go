@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/keegancsmith/sqlf"
 	"github.com/lib/pq"
 	"github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/bundles/types"
@@ -33,19 +35,6 @@ func (r printableTime) String() string {
 // makeCommit formats an integer as a 40-character git commit hash.
 func makeCommit(i int) string {
 	return fmt.Sprintf("%040d", i)
-}
-
-// TODO
-// getDumpVisibilities returns a map from dump identifiers to its visibility. Fails the test on error.
-func getDumpVisibilities(t *testing.T, db *sql.DB) map[int]bool {
-	// TODO - replace
-	return nil
-	// visibilities, err := scanVisibilities(db.Query("SELECT id, visible_at_tip FROM lsif_dumps_with_repository_name"))
-	// if err != nil {
-	// 	t.Fatalf("unexpected error while scanning dump visibility: %s", err)
-	// }
-
-	// return visibilities
 }
 
 // insertUploads populates the lsif_uploads table with the given upload models.
@@ -202,7 +191,33 @@ func insertNearestUploads(t *testing.T, db *sql.DB, repositoryID int, uploads ma
 	if _, err := db.ExecContext(context.Background(), query.Query(sqlf.PostgresBindVar), query.Args()...); err != nil {
 		t.Fatalf("unexpected error while upserting repository: %s", err)
 	}
+}
 
+func toUploadMeta(uploads []Upload) map[string][]UploadMeta {
+	meta := map[string][]UploadMeta{}
+	for _, upload := range uploads {
+		meta[upload.Commit] = append(meta[upload.Commit], UploadMeta{
+			UploadID: upload.ID,
+			Root:     upload.Root,
+			Indexer:  upload.Indexer,
+		})
+	}
+
+	return meta
+}
+
+var UploadMetaComparer = cmp.Comparer(func(x, y UploadMeta) bool {
+	return x.UploadID == y.UploadID && x.Distance == y.Distance
+})
+
+func normalizeVisibleUploads(uploads map[string][]UploadMeta) map[string][]UploadMeta {
+	for _, metas := range uploads {
+		sort.Slice(metas, func(i, j int) bool {
+			return metas[i].UploadID-metas[j].UploadID < 0
+		})
+	}
+
+	return uploads
 }
 
 // unwrapStore gets the underlying store from a store interface value.

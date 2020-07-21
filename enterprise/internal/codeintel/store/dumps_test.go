@@ -70,7 +70,6 @@ func TestGetDumpByID(t *testing.T) {
 }
 
 func TestFindClosestDumps(t *testing.T) {
-	t.Skip() // FIXME
 	if testing.Short() {
 		t.Skip()
 	}
@@ -83,25 +82,43 @@ func TestFindClosestDumps(t *testing.T) {
 	//       |              |           |
 	//       +-- [3] -- 4 --+           +--- 8
 
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// 	makeCommit(2): {makeCommit(1)},
-	// 	makeCommit(3): {makeCommit(1)},
-	// 	makeCommit(4): {makeCommit(3)},
-	// 	makeCommit(5): {makeCommit(2), makeCommit(4)},
-	// 	makeCommit(6): {makeCommit(5)},
-	// 	makeCommit(7): {makeCommit(6)},
-	// 	makeCommit(8): {makeCommit(6)},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
+	uploads := []Upload{
+		{ID: 1, Commit: makeCommit(1)},
+		{ID: 2, Commit: makeCommit(3)},
+		{ID: 3, Commit: makeCommit(7)},
+	}
+	insertUploads(t, dbconn.Global, uploads...)
 
-	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(1)},
-		Upload{ID: 2, Commit: makeCommit(3)},
-		Upload{ID: 3, Commit: makeCommit(7)},
-	)
+	graph := map[string][]string{
+		makeCommit(1): {},
+		makeCommit(2): {makeCommit(1)},
+		makeCommit(3): {makeCommit(1)},
+		makeCommit(4): {makeCommit(3)},
+		makeCommit(5): {makeCommit(2), makeCommit(4)},
+		makeCommit(6): {makeCommit(5)},
+		makeCommit(7): {makeCommit(6)},
+		makeCommit(8): {makeCommit(6)},
+	}
+
+	visibleUploads, err := calculateVisibleUploads(graph, toUploadMeta(uploads))
+	if err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+	insertNearestUploads(t, dbconn.Global, 50, visibleUploads)
+
+	expectedVisibleUploads := map[string][]UploadMeta{
+		makeCommit(1): {{UploadID: 1, Distance: 0}},
+		makeCommit(2): {{UploadID: 1, Distance: 1}},
+		makeCommit(3): {{UploadID: 2, Distance: 0}},
+		makeCommit(4): {{UploadID: 2, Distance: 1}},
+		makeCommit(5): {{UploadID: 1, Distance: 2}},
+		makeCommit(6): {{UploadID: 3, Distance: 1}},
+		makeCommit(7): {{UploadID: 3, Distance: 0}},
+		makeCommit(8): {{UploadID: 1, Distance: 4}},
+	}
+	if diff := cmp.Diff(expectedVisibleUploads, normalizeVisibleUploads(visibleUploads), UploadMetaComparer); diff != "" {
+		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
+	}
 
 	testFindClosestDumps(t, store, []FindClosestDumpsTestCase{
 		{commit: makeCommit(1), file: "file.ts", rootMustEnclosePath: true, anyOfIDs: []int{1}},
@@ -116,7 +133,6 @@ func TestFindClosestDumps(t *testing.T) {
 }
 
 func TestFindClosestDumpsAlternateCommitGraph(t *testing.T) {
-	t.Skip() // FIXME
 	if testing.Short() {
 		t.Skip()
 	}
@@ -131,23 +147,42 @@ func TestFindClosestDumpsAlternateCommitGraph(t *testing.T) {
 	//              |
 	//              +-- 7 -- 8
 
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// 	makeCommit(2): {makeCommit(1)},
-	// 	makeCommit(3): {makeCommit(2)},
-	// 	makeCommit(4): {makeCommit(1)},
-	// 	makeCommit(5): {makeCommit(4)},
-	// 	makeCommit(6): {makeCommit(5)},
-	// 	makeCommit(7): {makeCommit(4)},
-	// 	makeCommit(8): {makeCommit(7)},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
+	uploads := []Upload{
+		{ID: 1, Commit: makeCommit(2)},
+	}
+	insertUploads(t, dbconn.Global, uploads...)
 
-	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(2)},
-	)
+	graph := map[string][]string{
+		makeCommit(1): {},
+		makeCommit(2): {makeCommit(1)},
+		makeCommit(3): {makeCommit(2)},
+		makeCommit(4): {makeCommit(1)},
+		makeCommit(5): {makeCommit(4)},
+		makeCommit(6): {makeCommit(5)},
+		makeCommit(7): {makeCommit(4)},
+		makeCommit(8): {makeCommit(7)},
+	}
+
+	visibleUploads, err := calculateVisibleUploads(graph, toUploadMeta(uploads))
+	if err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+	insertNearestUploads(t, dbconn.Global, 50, visibleUploads)
+
+	expectedVisibleUploads := map[string][]UploadMeta{
+		makeCommit(1): {{UploadID: 1, Distance: 1}},
+		makeCommit(2): {{UploadID: 1, Distance: 0}},
+		makeCommit(3): {{UploadID: 1, Distance: 1}},
+		makeCommit(4): nil,
+		makeCommit(5): nil,
+		makeCommit(6): nil,
+		makeCommit(7): nil,
+		makeCommit(8): nil,
+	}
+	normalizeVisibleUploads(visibleUploads)
+	if diff := cmp.Diff(expectedVisibleUploads, normalizeVisibleUploads(visibleUploads), UploadMetaComparer); diff != "" {
+		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
+	}
 
 	testFindClosestDumps(t, store, []FindClosestDumpsTestCase{
 		{commit: makeCommit(1), allOfIDs: []int{1}},
@@ -162,7 +197,6 @@ func TestFindClosestDumpsAlternateCommitGraph(t *testing.T) {
 }
 
 func TestFindClosestDumpsDistinctRoots(t *testing.T) {
-	t.Skip() // FIXME
 	if testing.Short() {
 		t.Skip()
 	}
@@ -173,18 +207,30 @@ func TestFindClosestDumpsDistinctRoots(t *testing.T) {
 	//
 	// 1 --+-- [2]
 
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// 	makeCommit(2): {makeCommit(1)},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
+	uploads := []Upload{
+		{ID: 1, Commit: makeCommit(2), Root: "root1/"},
+		{ID: 2, Commit: makeCommit(2), Root: "root2/"},
+	}
+	insertUploads(t, dbconn.Global, uploads...)
 
-	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(2), Root: "root1/"},
-		Upload{ID: 2, Commit: makeCommit(2), Root: "root2/"},
-	)
+	graph := map[string][]string{
+		makeCommit(1): {},
+		makeCommit(2): {makeCommit(1)},
+	}
+
+	visibleUploads, err := calculateVisibleUploads(graph, toUploadMeta(uploads))
+	if err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+	insertNearestUploads(t, dbconn.Global, 50, visibleUploads)
+
+	expectedVisibleUploads := map[string][]UploadMeta{
+		makeCommit(1): {{UploadID: 1, Distance: 1}, {UploadID: 2, Distance: 1}},
+		makeCommit(2): {{UploadID: 1, Distance: 0}, {UploadID: 2, Distance: 0}},
+	}
+	if diff := cmp.Diff(expectedVisibleUploads, normalizeVisibleUploads(visibleUploads), UploadMetaComparer); diff != "" {
+		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
+	}
 
 	testFindClosestDumps(t, store, []FindClosestDumpsTestCase{
 		{commit: makeCommit(1), file: "blah", rootMustEnclosePath: true},
@@ -196,7 +242,6 @@ func TestFindClosestDumpsDistinctRoots(t *testing.T) {
 }
 
 func TestFindClosestDumpsOverlappingRoots(t *testing.T) {
-	t.Skip() // FIXME
 	if testing.Short() {
 		t.Skip()
 	}
@@ -211,102 +256,104 @@ func TestFindClosestDumpsOverlappingRoots(t *testing.T) {
 	//
 	// With the following LSIF dumps:
 	//
-	// | Commit | Root    | Indexer |
-	// | ------ + ------- + ------- |
-	// | 1      | root3/  | lsif-go |
-	// | 1      | root4/  | lsif-py |
-	// | 2      | root1/  | lsif-go |
-	// | 2      | root2/  | lsif-go |
-	// | 2      |         | lsif-py | (overwrites root4/ at commit 1)
-	// | 3      | root1/  | lsif-go | (overwrites root1/ at commit 2)
-	// | 4      |         | lsif-py | (overwrites (root) at commit 2)
-	// | 5      | root2/  | lsif-go | (overwrites root2/ at commit 2)
-	// | 6      | root1/  | lsif-go | (overwrites root1/ at commit 2)
+	// | UploadID | Commit | Root    | Indexer |
+	// | -------- + ------ + ------- + ------- |
+	// | 1        | 1      | root3/  | lsif-go |
+	// | 2        | 1      | root4/  | lsif-py |
+	// | 3        | 2      | root1/  | lsif-go |
+	// | 4        | 2      | root2/  | lsif-go |
+	// | 5        | 2      |         | lsif-py | (overwrites root4/ at commit 1)
+	// | 6        | 3      | root1/  | lsif-go | (overwrites root1/ at commit 2)
+	// | 7        | 4      |         | lsif-py | (overwrites (root) at commit 2)
+	// | 8        | 5      | root2/  | lsif-go | (overwrites root2/ at commit 2)
+	// | 9        | 6      | root1/  | lsif-go | (overwrites root1/ at commit 2)
 
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// 	makeCommit(2): {makeCommit(1)},
-	// 	makeCommit(3): {makeCommit(2)},
-	// 	makeCommit(4): {makeCommit(2)},
-	// 	makeCommit(5): {makeCommit(3), makeCommit(4)},
-	// 	makeCommit(6): {makeCommit(5)},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
+	uploads := []Upload{
+		{ID: 1, Commit: makeCommit(1), Indexer: "lsif-go", Root: "root3/"},
+		{ID: 2, Commit: makeCommit(1), Indexer: "lsif-py", Root: "root4/"},
+		{ID: 3, Commit: makeCommit(2), Indexer: "lsif-go", Root: "root1/"},
+		{ID: 4, Commit: makeCommit(2), Indexer: "lsif-go", Root: "root2/"},
+		{ID: 5, Commit: makeCommit(2), Indexer: "lsif-py", Root: ""},
+		{ID: 6, Commit: makeCommit(3), Indexer: "lsif-go", Root: "root1/"},
+		{ID: 7, Commit: makeCommit(4), Indexer: "lsif-py", Root: ""},
+		{ID: 8, Commit: makeCommit(5), Indexer: "lsif-go", Root: "root2/"},
+		{ID: 9, Commit: makeCommit(6), Indexer: "lsif-go", Root: "root1/"},
+	}
+	insertUploads(t, dbconn.Global, uploads...)
 
-	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(1), Root: "root3/"},
-		Upload{ID: 2, Commit: makeCommit(1), Root: "root4/", Indexer: "lsif-py"},
-		Upload{ID: 3, Commit: makeCommit(2), Root: "root1/"},
-		Upload{ID: 4, Commit: makeCommit(2), Root: "root2/"},
-		Upload{ID: 5, Commit: makeCommit(2), Root: "", Indexer: "lsif-py"},
-		Upload{ID: 6, Commit: makeCommit(3), Root: "root1/"},
-		Upload{ID: 7, Commit: makeCommit(4), Root: "", Indexer: "lsif-py"},
-		Upload{ID: 8, Commit: makeCommit(5), Root: "root2/"},
-		Upload{ID: 9, Commit: makeCommit(6), Root: "root1/"},
-	)
+	graph := map[string][]string{
+		makeCommit(1): {},
+		makeCommit(2): {makeCommit(1)},
+		makeCommit(3): {makeCommit(2)},
+		makeCommit(4): {makeCommit(2)},
+		makeCommit(5): {makeCommit(3), makeCommit(4)},
+		makeCommit(6): {makeCommit(5)},
+	}
+
+	visibleUploads, err := calculateVisibleUploads(graph, toUploadMeta(uploads))
+	if err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+	insertNearestUploads(t, dbconn.Global, 50, visibleUploads)
+
+	expectedVisibleUploads := map[string][]UploadMeta{
+		makeCommit(1): {
+			{UploadID: 1, Distance: 0},
+			{UploadID: 2, Distance: 0},
+			{UploadID: 3, Distance: 1},
+			{UploadID: 4, Distance: 1},
+			{UploadID: 5, Distance: 1},
+		},
+		makeCommit(2): {
+			{UploadID: 1, Distance: 1},
+			{UploadID: 2, Distance: 1},
+			{UploadID: 3, Distance: 0},
+			{UploadID: 4, Distance: 0},
+			{UploadID: 5, Distance: 0},
+		},
+		makeCommit(3): {
+			{UploadID: 1, Distance: 2},
+			{UploadID: 2, Distance: 2},
+			{UploadID: 4, Distance: 1},
+			{UploadID: 5, Distance: 1},
+			{UploadID: 6, Distance: 0},
+		},
+		makeCommit(4): {
+			{UploadID: 1, Distance: 2},
+			{UploadID: 2, Distance: 2},
+			{UploadID: 3, Distance: 1},
+			{UploadID: 4, Distance: 1},
+			{UploadID: 7, Distance: 0},
+		},
+		makeCommit(5): {
+			{UploadID: 1, Distance: 3},
+			{UploadID: 2, Distance: 3},
+			{UploadID: 6, Distance: 1},
+			{UploadID: 7, Distance: 1},
+			{UploadID: 8, Distance: 0},
+		},
+		makeCommit(6): {
+			{UploadID: 1, Distance: 4},
+			{UploadID: 2, Distance: 4},
+			{UploadID: 7, Distance: 2},
+			{UploadID: 8, Distance: 1},
+			{UploadID: 9, Distance: 0},
+		},
+	}
+	if diff := cmp.Diff(expectedVisibleUploads, normalizeVisibleUploads(visibleUploads), UploadMetaComparer); diff != "" {
+		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
+	}
 
 	testFindClosestDumps(t, store, []FindClosestDumpsTestCase{
 		{commit: makeCommit(4), file: "root1/file.ts", rootMustEnclosePath: true, allOfIDs: []int{7, 3}},
 		{commit: makeCommit(5), file: "root2/file.ts", rootMustEnclosePath: true, allOfIDs: []int{8, 7}},
 		{commit: makeCommit(3), file: "root3/file.ts", rootMustEnclosePath: true, allOfIDs: []int{5, 1}},
-		{commit: makeCommit(1), file: "root4/file.ts", rootMustEnclosePath: true, allOfIDs: []int{2}},
-		{commit: makeCommit(2), file: "root4/file.ts", rootMustEnclosePath: true, allOfIDs: []int{5}},
-	})
-}
-
-func TestFindClosestDumpsMaxTraversalLimit(t *testing.T) {
-	t.Skip() // FIXME
-	if testing.Short() {
-		t.Skip()
-	}
-	dbtesting.SetupGlobalTestDB(t)
-	store := testStore()
-
-	// This repository has the following commit graph (ancestors to the left):
-	//
-	// MAX_TRAVERSAL_LIMIT -- ... -- 2 -- 1 -- 0
-	//
-	// At commit `50`, the traversal limit will be reached before visiting commit `0`
-	// because commits are visited in this order:
-	//
-	// | depth | commit |
-	// | ----- | ------ |
-	// | 1     | 50     | (with direction 'A')
-	// | 2     | 50     | (with direction 'D')
-	// | 3     | 51     |
-	// | 4     | 49     |
-	// | 5     | 52     |
-	// | 6     | 48     |
-	// | ...   |        |
-	// | 99    | 99     |
-	// | 100   | 1      | (limit reached)
-
-	const MaxTraversalLimit = 150
-
-	commits := map[string][]string{}
-	for i := 0; i < MaxTraversalLimit; i++ {
-		commits[makeCommit(i)] = []string{makeCommit(i + 1)}
-	}
-
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, commits); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
-
-	insertUploads(t, dbconn.Global, Upload{ID: 1, Commit: makeCommit(0)})
-
-	testFindClosestDumps(t, store, []FindClosestDumpsTestCase{
-		{commit: makeCommit(0), file: "file.ts", rootMustEnclosePath: true, allOfIDs: []int{1}},
-		{commit: makeCommit(1), file: "file.ts", rootMustEnclosePath: true, allOfIDs: []int{1}},
-		{commit: makeCommit(MaxTraversalLimit/2 - 1), file: "file.ts", rootMustEnclosePath: true, allOfIDs: []int{1}},
-		{commit: makeCommit(MaxTraversalLimit / 2), file: "file.ts", rootMustEnclosePath: true},
+		{commit: makeCommit(1), file: "root4/file.ts", rootMustEnclosePath: true, allOfIDs: []int{2, 5}},
+		{commit: makeCommit(2), file: "root4/file.ts", rootMustEnclosePath: true, allOfIDs: []int{2, 5}},
 	})
 }
 
 func TestFindClosestDumpsIndexerName(t *testing.T) {
-	t.Skip() // FIXME
 	if testing.Short() {
 		t.Skip()
 	}
@@ -317,27 +364,87 @@ func TestFindClosestDumpsIndexerName(t *testing.T) {
 	//
 	// [1] --+-- [2] --+-- [3] --+-- [4] --+-- 5
 
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// 	makeCommit(2): {makeCommit(1)},
-	// 	makeCommit(3): {makeCommit(2)},
-	// 	makeCommit(4): {makeCommit(3)},
-	// 	makeCommit(5): {makeCommit(4)},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
+	uploads := []Upload{
+		{ID: 1, Commit: makeCommit(1), Root: "root1/", Indexer: "idx1"},
+		{ID: 2, Commit: makeCommit(2), Root: "root2/", Indexer: "idx1"},
+		{ID: 3, Commit: makeCommit(3), Root: "root3/", Indexer: "idx1"},
+		{ID: 4, Commit: makeCommit(4), Root: "root4/", Indexer: "idx1"},
+		{ID: 5, Commit: makeCommit(1), Root: "root1/", Indexer: "idx2"},
+		{ID: 6, Commit: makeCommit(2), Root: "root2/", Indexer: "idx2"},
+		{ID: 7, Commit: makeCommit(3), Root: "root3/", Indexer: "idx2"},
+		{ID: 8, Commit: makeCommit(4), Root: "root4/", Indexer: "idx2"},
+	}
+	insertUploads(t, dbconn.Global, uploads...)
 
-	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(1), Root: "root1/", Indexer: "idx1"},
-		Upload{ID: 2, Commit: makeCommit(2), Root: "root2/", Indexer: "idx1"},
-		Upload{ID: 3, Commit: makeCommit(3), Root: "root3/", Indexer: "idx1"},
-		Upload{ID: 4, Commit: makeCommit(4), Root: "root4/", Indexer: "idx1"},
-		Upload{ID: 5, Commit: makeCommit(1), Root: "root1/", Indexer: "idx2"},
-		Upload{ID: 6, Commit: makeCommit(2), Root: "root2/", Indexer: "idx2"},
-		Upload{ID: 7, Commit: makeCommit(3), Root: "root3/", Indexer: "idx2"},
-		Upload{ID: 8, Commit: makeCommit(4), Root: "root4/", Indexer: "idx2"},
-	)
+	graph := map[string][]string{
+		makeCommit(1): {},
+		makeCommit(2): {makeCommit(1)},
+		makeCommit(3): {makeCommit(2)},
+		makeCommit(4): {makeCommit(3)},
+		makeCommit(5): {makeCommit(4)},
+	}
+
+	visibleUploads, err := calculateVisibleUploads(graph, toUploadMeta(uploads))
+	if err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+	insertNearestUploads(t, dbconn.Global, 50, visibleUploads)
+
+	expectedVisibleUploads := map[string][]UploadMeta{
+		makeCommit(1): {
+			{UploadID: 1, Distance: 0},
+			{UploadID: 2, Distance: 1},
+			{UploadID: 3, Distance: 2},
+			{UploadID: 4, Distance: 3},
+			{UploadID: 5, Distance: 0},
+			{UploadID: 6, Distance: 1},
+			{UploadID: 7, Distance: 2},
+			{UploadID: 8, Distance: 3},
+		},
+		makeCommit(2): {
+			{UploadID: 1, Distance: 1},
+			{UploadID: 2, Distance: 0},
+			{UploadID: 3, Distance: 1},
+			{UploadID: 4, Distance: 2},
+			{UploadID: 5, Distance: 1},
+			{UploadID: 6, Distance: 0},
+			{UploadID: 7, Distance: 1},
+			{UploadID: 8, Distance: 2},
+		},
+		makeCommit(3): {
+			{UploadID: 1, Distance: 2},
+			{UploadID: 2, Distance: 1},
+			{UploadID: 3, Distance: 0},
+			{UploadID: 4, Distance: 1},
+			{UploadID: 5, Distance: 2},
+			{UploadID: 6, Distance: 1},
+			{UploadID: 7, Distance: 0},
+			{UploadID: 8, Distance: 1},
+		},
+		makeCommit(4): {
+			{UploadID: 1, Distance: 3},
+			{UploadID: 2, Distance: 2},
+			{UploadID: 3, Distance: 1},
+			{UploadID: 4, Distance: 0},
+			{UploadID: 5, Distance: 3},
+			{UploadID: 6, Distance: 2},
+			{UploadID: 7, Distance: 1},
+			{UploadID: 8, Distance: 0},
+		},
+		makeCommit(5): {
+			{UploadID: 1, Distance: 4},
+			{UploadID: 2, Distance: 3},
+			{UploadID: 3, Distance: 2},
+			{UploadID: 4, Distance: 1},
+			{UploadID: 5, Distance: 4},
+			{UploadID: 6, Distance: 3},
+			{UploadID: 7, Distance: 2},
+			{UploadID: 8, Distance: 1},
+		},
+	}
+	if diff := cmp.Diff(expectedVisibleUploads, normalizeVisibleUploads(visibleUploads), UploadMetaComparer); diff != "" {
+		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
+	}
 
 	testFindClosestDumps(t, store, []FindClosestDumpsTestCase{
 		{commit: makeCommit(5), file: "root1/file.ts", indexer: "idx1", allOfIDs: []int{1}},
@@ -352,23 +459,37 @@ func TestFindClosestDumpsIndexerName(t *testing.T) {
 }
 
 func TestFindClosestDumpsIntersectingPath(t *testing.T) {
-	t.Skip() // FIXME
 	if testing.Short() {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
 	store := testStore()
 
-	// TODO - replace
-	// if err := store.UpdateCommits(context.Background(), 50, map[string][]string{
-	// 	makeCommit(1): {},
-	// }); err != nil {
-	// 	t.Fatalf("unexpected error updating commits: %s", err)
-	// }
+	// This database has the following commit graph:
+	//
+	// [1]
 
-	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(1), Root: "web/src/", Indexer: "lsif-eslint"},
-	)
+	uploads := []Upload{
+		{ID: 1, Commit: makeCommit(1), Root: "web/src/", Indexer: "lsif-eslint"},
+	}
+	insertUploads(t, dbconn.Global, uploads...)
+
+	graph := map[string][]string{
+		makeCommit(1): {},
+	}
+
+	visibleUploads, err := calculateVisibleUploads(graph, toUploadMeta(uploads))
+	if err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+	insertNearestUploads(t, dbconn.Global, 50, visibleUploads)
+
+	expectedVisibleUploads := map[string][]UploadMeta{
+		makeCommit(1): {{UploadID: 1, Distance: 0}},
+	}
+	if diff := cmp.Diff(expectedVisibleUploads, normalizeVisibleUploads(visibleUploads), UploadMetaComparer); diff != "" {
+		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
+	}
 
 	testFindClosestDumps(t, store, []FindClosestDumpsTestCase{
 		{commit: makeCommit(1), file: "", rootMustEnclosePath: false, allOfIDs: []int{1}},

@@ -295,7 +295,7 @@ func TestInsertUploadQueued(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := testStore()
 
 	insertRepo(t, dbconn.Global, 50, "")
 
@@ -350,7 +350,7 @@ func TestMarkQueued(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := testStore()
 
 	insertUploads(t, dbconn.Global, Upload{ID: 1, State: "uploading"})
 
@@ -375,7 +375,7 @@ func TestAddUploadPart(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := testStore()
 
 	insertUploads(t, dbconn.Global, Upload{ID: 1, State: "uploading"})
 
@@ -401,7 +401,7 @@ func TestMarkComplete(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := testStore()
 
 	insertUploads(t, dbconn.Global, Upload{ID: 1, State: "queued"})
 
@@ -423,7 +423,7 @@ func TestMarkErrored(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := testStore()
 
 	insertUploads(t, dbconn.Global, Upload{ID: 1, State: "queued"})
 
@@ -689,7 +689,7 @@ func TestRequeue(t *testing.T) {
 		t.Skip()
 	}
 	dbtesting.SetupGlobalTestDB(t)
-	store := rawTestStore()
+	store := testStore()
 
 	insertUploads(t, dbconn.Global, Upload{ID: 1, State: "processing"})
 

@@ -398,7 +398,7 @@ func (s *ObservedStore) Done(e error) error {
 	return err
 }
 
-// TODO - observe, document
+// Lock calls into the inner store and registers the observed results.
 func (s *ObservedStore) Lock(ctx context.Context, key int, blocking bool) (_ bool, _ UnlockFunc, err error) {
 	ctx, endObservation := s.lockOperation.With(ctx, &err, observation.Args{})
 	defer endObservation(1, observation.Args{})
