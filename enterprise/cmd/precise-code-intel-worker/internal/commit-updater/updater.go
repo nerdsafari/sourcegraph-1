@@ -11,13 +11,17 @@ import (
 	"github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/store"
 )
 
-// TODO - document
+// Updater periodically re-calculates the commit and upload visibility graph for repositories
+// that are marked as dirty by the worker process. This is done out-of-band from the rest of
+// the upload processing as it is likely that we are processing multiple uploads concurrently
+// for the same repository and should not repeat the work since the last calculation performed
+// will always be the one we want.
 type Updater struct {
 	store    store.Store
 	updater  commits.Updater
 	options  UpdaterOptions
 	clock    glock.Clock
-	ctx      context.Context // root context passed to the database
+	ctx      context.Context // root context passed to the updater
 	cancel   func()          // cancels the root context
 	finished chan struct{}   // signals that Start has finished
 }
@@ -44,7 +48,8 @@ func newUpdater(store store.Store, updater commits.Updater, options UpdaterOptio
 	}
 }
 
-// TODO - document
+// Start begins periodically checking for dirty repositories and invoking the underlying
+// updater on each one.
 func (u *Updater) Start() {
 	defer close(u.finished)
 
@@ -52,7 +57,7 @@ loop:
 	for {
 		repositoryIDs, err := u.store.DirtyRepositories(u.ctx)
 		if err != nil {
-			log15.Error("Failed to TODO", "err", err)
+			log15.Error("Failed to retrieve dirty repositories", "err", err)
 		}
 
 		for _, repositoryID := range repositoryIDs {
@@ -63,7 +68,7 @@ loop:
 					}
 				}
 
-				log15.Error("Failed to TODO", "err", err)
+				log15.Error("Failed to update repository commit graph", "err", err)
 			}
 		}
 
@@ -75,7 +80,7 @@ loop:
 	}
 }
 
-// TODO - document
+// Stop will cause the update loop to exit after the current iteration.
 func (u *Updater) Stop() {
 	u.cancel()
 	<-u.finished
