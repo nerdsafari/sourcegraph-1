@@ -61,7 +61,7 @@ loop:
 		}
 
 		for _, repositoryID := range repositoryIDs {
-			if err := u.updater.Update(context.Background(), repositoryID, false); err != nil {
+			if err := u.updater.Update(context.Background(), repositoryID, false, nil); err != nil {
 				for ex := err; ex != nil; ex = errors.Unwrap(ex) {
 					if err == u.ctx.Err() {
 						break loop

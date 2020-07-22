@@ -11,6 +11,38 @@ import (
 	"github.com/sourcegraph/sourcegraph/internal/db/dbtesting"
 )
 
+func TestHasRepository(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	dbtesting.SetupGlobalTestDB(t)
+	store := testStore()
+
+	testCases := []struct {
+		repositoryID int
+		exists       bool
+	}{
+		{50, true},
+		{51, false},
+	}
+
+	insertUploads(t, dbconn.Global, Upload{ID: 1, RepositoryID: 50})
+
+	for _, testCase := range testCases {
+		name := fmt.Sprintf("repositoryID=%d", testCase.repositoryID)
+
+		t.Run(name, func(t *testing.T) {
+			exists, err := store.HasRepository(context.Background(), testCase.repositoryID)
+			if err != nil {
+				t.Fatalf("unexpected error checking if repository exists: %s", err)
+			}
+			if exists != testCase.exists {
+				t.Errorf("unexpected exists. want=%v have=%v", testCase.exists, exists)
+			}
+		})
+	}
+}
+
 func TestHasCommit(t *testing.T) {
 	if testing.Short() {
 		t.Skip()

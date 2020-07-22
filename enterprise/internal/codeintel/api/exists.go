@@ -16,17 +16,28 @@ import (
 // path is a prefix are returned. These dump IDs should be subsequently passed to invocations of
 // Definitions, References, and Hover.
 func (api *codeIntelAPI) FindClosestDumps(ctx context.Context, repositoryID int, commit, path string, exactPath bool, indexer string) ([]store.Dump, error) {
+	// TODO - can collapse hascommit/hasrepository?
+	// TODO - extract and test this stuff
+	// TODO - document better
+
 	commitExists, err := api.store.HasCommit(ctx, repositoryID, commit)
 	if err != nil {
 		return nil, errors.Wrap(err, "store.HasCommit")
 	}
 	if !commitExists {
-		// TODO - ensure once we hit the lock that we still care, don't repopulate
-		// things unnecessarily because we got a bursty request for one repository
+		repositoryExists, err := api.store.HasRepository(ctx, repositoryID)
+		if err != nil {
+			return nil, errors.Wrap(err, "store.HasRepository")
+		}
+		if !repositoryExists {
+			return nil, nil
+		}
 
 		// If we are not aware of this commit, we need to update our commits table and the
 		// visibility of the dumps in this repository.
-		if err := api.commitUpdater.Update(ctx, repositoryID, true); err != nil {
+		if err := api.commitUpdater.Update(ctx, repositoryID, true, func(ctx context.Context) (bool, error) {
+			return api.store.HasCommit(ctx, repositoryID, commit)
+		}); err != nil {
 			return nil, errors.Wrap(err, "commitUpdater.Update")
 		}
 	}

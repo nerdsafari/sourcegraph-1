@@ -134,22 +134,55 @@ func (s *store) FindClosestDumps(ctx context.Context, repositoryID int, commit, 
 	))
 }
 
+func scanFirstIntPair(rows *sql.Rows, queryErr error) (_ int, _ int, _ bool, err error) {
+	if queryErr != nil {
+		return 0, 0, false, queryErr
+	}
+	defer func() { err = closeRows(rows, err) }()
+
+	if rows.Next() {
+		var value1 int
+		var value2 int
+		if err := rows.Scan(&value1, &value2); err != nil {
+			return 0, 0, false, err
+		}
+
+		return value1, value2, true, nil
+	}
+
+	return 0, 0, false, nil
+}
+
 // DeleteOldestDump deletes the oldest dump that is not currently visible at the tip of its repository's default branch.
 // This method returns the deleted dump's identifier and a flag indicating its (previous) existence.
-func (s *store) DeleteOldestDump(ctx context.Context) (int, bool, error) {
-	//
-	// TODO - need to also mark repository as dirty here
-	//
+func (s *store) DeleteOldestDump(ctx context.Context) (_ int, _ bool, err error) {
+	tx, err := s.transact(ctx)
+	if err != nil {
+		return 0, false, err
+	}
+	defer func() { err = tx.Done(err) }()
 
-	return scanFirstInt(s.query(ctx, sqlf.Sprintf(`
+	id, repositoryID, deleted, err := scanFirstIntPair(tx.query(ctx, sqlf.Sprintf(`
 		DELETE FROM lsif_uploads
 		WHERE id IN (
 			SELECT d.id FROM lsif_dumps_with_repository_name d
 			WHERE NOT EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip WHERE repository_id = d.repository_id AND upload_id = d.id)
 			ORDER BY d.uploaded_at
 			LIMIT 1
-		) RETURNING id
+		) RETURNING id, repository_id
 	`)))
+	if err != nil {
+		return 0, false, err
+	}
+	if !deleted {
+		return 0, false, nil
+	}
+
+	if err := tx.MarkRepositoryAsDirty(ctx, repositoryID); err != nil {
+		return 0, false, err
+	}
+
+	return id, true, nil
 }
 
 // DeleteOverlapapingDumps deletes all completed uploads for the given repository with the same

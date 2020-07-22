@@ -121,6 +121,9 @@ type Store interface {
 	// default branch.
 	PackageReferencePager(ctx context.Context, scheme, name, version string, repositoryID, limit int) (int, ReferencePager, error)
 
+	// HasRepository determines if there is LSIF data for the given repository.
+	HasRepository(ctx context.Context, repositoryID int) (bool, error)
+
 	// HasCommit determines if the given commit is known for the given repository.
 	HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error)
 

@@ -13,8 +13,11 @@ import (
 // queries for a commit we are unaware of (a commit newer than our latest LSIF upload), and
 // after processing an upload for a repository.
 type Updater interface {
-	Update(ctx context.Context, repositoryID int, blocking bool) error
+	Update(ctx context.Context, repositoryID int, blocking bool, check CheckFunc) error
 }
+
+// TODO - document, test new interface
+type CheckFunc func(ctx context.Context) (bool, error)
 
 type updater struct {
 	store           store.Store
@@ -36,7 +39,7 @@ func NewUpdater(store store.Store, gitserverClient gitserver.Client) Updater {
 // If blocking is true, then this method will wait for an advisory lock to be granted. If
 // blocking is false, this procedure will only be performed if the commit graph for this
 // repository is not being calculated by another service.
-func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool) (err error) {
+func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool, check CheckFunc) (err error) {
 	ok, unlock, err := u.store.Lock(ctx, repositoryID, blocking)
 	if err != nil || !ok {
 		return errors.Wrap(err, "store.Lock")
@@ -44,6 +47,16 @@ func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool) (
 	defer func() {
 		err = unlock(err)
 	}()
+
+	if check != nil {
+		ok, err := check(ctx)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+	}
 
 	graph, err := u.gitserverClient.CommitGraph(context.Background(), u.store, repositoryID)
 	if err != nil {

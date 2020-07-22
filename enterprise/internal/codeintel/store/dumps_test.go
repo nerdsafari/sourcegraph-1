@@ -468,6 +468,15 @@ func TestDeleteOldestDump(t *testing.T) {
 		t.Errorf("unexpected pruned identifier. want=%d have=%d", 1, id)
 	}
 
+	repositoryIDs, err := store.DirtyRepositories(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error listing dirty repositories: %s", err)
+	}
+
+	if len(repositoryIDs) != 1 || repositoryIDs[0] != 50 {
+		t.Errorf("expected repository to be marked dirty")
+	}
+
 	// Prune next oldest (skips visible at tip)
 	if id, prunable, err := store.DeleteOldestDump(context.Background()); err != nil {
 		t.Fatalf("unexpected error pruning dumps: %s", err)

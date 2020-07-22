@@ -34,11 +34,20 @@ func scanUploadMeta(rows *sql.Rows, queryErr error) (_ map[string][]UploadMeta, 
 	return uploadMeta, nil
 }
 
+// HasRepository determines if there is LSIF data for the given repository.
+func (s *store) HasRepository(ctx context.Context, repositoryID int) (bool, error) {
+	count, _, err := scanFirstInt(s.query(ctx, sqlf.Sprintf(`
+		SELECT COUNT(*)
+		FROM lsif_uploads
+		WHERE repository_id = %s
+		LIMIT 1
+	`, repositoryID)))
+
+	return count > 0, err
+}
+
 // HasCommit determines if the given commit is known for the given repository.
 func (s *store) HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error) {
-	// TODO - can this trigger a bad update loop for
-	// repos with no data or weirdly unreachable commits?
-
 	count, _, err := scanFirstInt(s.query(ctx, sqlf.Sprintf(`
 		SELECT COUNT(*)
 		FROM lsif_nearest_uploads

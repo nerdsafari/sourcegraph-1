@@ -38,6 +38,7 @@ type ObservedStore struct {
 	sameRepoPagerOperation                  *observation.Operation
 	updatePackageReferencesOperation        *observation.Operation
 	packageReferencePagerOperation          *observation.Operation
+	hasRepositoryOperation                  *observation.Operation
 	hasCommitOperation                      *observation.Operation
 	markRepositoryAsDirtyOperation          *observation.Operation
 	dirtyRepositoriesOperation              *observation.Operation
@@ -199,6 +200,11 @@ func NewObserved(store Store, observationContext *observation.Context) Store {
 			MetricLabels: []string{"package_reference_pager"},
 			Metrics:      metrics,
 		}),
+		hasRepositoryOperation: observationContext.Operation(observation.Op{
+			Name:         "store.HasRepository",
+			MetricLabels: []string{"has_repository"},
+			Metrics:      metrics,
+		}),
 		hasCommitOperation: observationContext.Operation(observation.Op{
 			Name:         "store.HasCommit",
 			MetricLabels: []string{"has_commit"},
@@ -340,6 +346,7 @@ func (s *ObservedStore) wrap(other Store) Store {
 		sameRepoPagerOperation:                  s.sameRepoPagerOperation,
 		updatePackageReferencesOperation:        s.updatePackageReferencesOperation,
 		packageReferencePagerOperation:          s.packageReferencePagerOperation,
+		hasRepositoryOperation:                  s.hasRepositoryOperation,
 		hasCommitOperation:                      s.hasCommitOperation,
 		markRepositoryAsDirtyOperation:          s.markRepositoryAsDirtyOperation,
 		dirtyRepositoriesOperation:              s.dirtyRepositoriesOperation,
@@ -573,6 +580,13 @@ func (s *ObservedStore) PackageReferencePager(ctx context.Context, scheme, name,
 	ctx, endObservation := s.packageReferencePagerOperation.With(ctx, &err, observation.Args{})
 	defer endObservation(1, observation.Args{})
 	return s.store.PackageReferencePager(ctx, scheme, name, version, repositoryID, limit)
+}
+
+// HasRepository calls into the inner store and registers the observed results.
+func (s *ObservedStore) HasRepository(ctx context.Context, repositoryID int) (_ bool, err error) {
+	ctx, endObservation := s.hasRepositoryOperation.With(ctx, &err, observation.Args{})
+	defer endObservation(1, observation.Args{})
+	return s.store.HasRepository(ctx, repositoryID)
 }
 
 // HasCommit calls into the inner store and registers the observed results.
