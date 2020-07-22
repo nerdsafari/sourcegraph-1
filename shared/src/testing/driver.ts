@@ -14,7 +14,7 @@ import puppeteer, {
 } from 'puppeteer'
 import { Key } from 'ts-key-enum'
 import { dataOrThrowErrors, gql, GraphQLResult } from '../graphql/graphql'
-import { IMutation, IQuery, ExternalServiceKind, IRepository, IPatchSet, IPatchInput } from '../graphql/schema'
+import { IMutation, IQuery, ExternalServiceKind, IRepository } from '../graphql/schema'
 import { readEnvironmentBoolean, retry } from './utils'
 import { formatPuppeteerConsoleMessage } from './console'
 import * as path from 'path'
@@ -479,21 +479,6 @@ export class Driver {
         return repository
     }
 
-    public async createPatchSetFromPatches(patches: IPatchInput[]): Promise<Pick<IPatchSet, 'previewURL'>> {
-        const response = await this.makeGraphQLRequest<IMutation>({
-            request: gql`
-                mutation($patches: [PatchInput!]!) {
-                    createPatchSetFromPatches(patches: $patches) {
-                        previewURL
-                    }
-                }
-            `,
-            variables: { patches },
-        })
-        const { createPatchSetFromPatches } = dataOrThrowErrors(response)
-        return createPatchSetFromPatches
-    }
-
     public async setConfig(
         path: jsonc.JSONPath,
         editFunction: (oldValue: jsonc.Node | undefined) => any
@@ -778,7 +763,8 @@ export async function createDriverForTest(options?: DriverOptions): Promise<Driv
                         !message.text().includes('Download the React DevTools') &&
                         !message.text().includes('[HMR]') &&
                         !message.text().includes('[WDS]') &&
-                        !message.text().includes('Warning: componentWillReceiveProps has been renamed')
+                        !message.text().includes('Warning: componentWillReceiveProps has been renamed') &&
+                        !message.text().includes('React-Hot-Loader')
                 ),
                 // Immediately format remote handles to strings, but maintain order.
                 map(formatPuppeteerConsoleMessage),

@@ -204,49 +204,112 @@ func TestSearch(t *testing.T) {
 		}
 	})
 
-	t.Run("global text search", func(t *testing.T) {
+	t.Run("global search", func(t *testing.T) {
 		tests := []struct {
-			name              string
-			query             string
-			wantMinResults    int
-			wantMaxResults    int
-			wantMinMatchCount int64
+			name          string
+			query         string
+			zeroResult    bool
+			minMatchCount int64
 		}{
+			// Global search
 			{
-				name:           "error",
-				query:          "error",
-				wantMinResults: 10,
-				wantMaxResults: -1,
+				name:  "error",
+				query: "error",
 			},
 			{
-				name:           "error count:1000",
-				query:          "error count:1000",
-				wantMinResults: 10,
-				wantMaxResults: -1,
+				name:  "error count:1000",
+				query: "error count:1000",
 			},
 			{
-				name:              "something with more than 1000 results and use count:1000",
-				query:             ". count:1000",
-				wantMinResults:    10,
-				wantMaxResults:    -1,
-				wantMinMatchCount: 1001,
+				name:          "something with more than 1000 results and use count:1000",
+				query:         ". count:1000",
+				minMatchCount: 1001,
 			},
 			{
-				name:           "regular expression without indexed search",
-				query:          "index:no patterntype:regexp ^func.*$",
-				wantMinResults: 10,
-				wantMaxResults: -1,
+				name:  "regular expression without indexed search",
+				query: "index:no patterntype:regexp ^func.*$",
 			},
 			{
-				name:           "fork:only",
-				query:          "fork:only router",
-				wantMinResults: 10,
-				wantMaxResults: -1,
+				name:  "fork:only",
+				query: "fork:only router",
 			},
 			{
-				name:           "fork:no",
-				query:          "fork:no FORK_SENTINEL",
-				wantMaxResults: 0,
+				name:  "double-quoted pattern, nonzero result",
+				query: `"func main() {\n" patterntype:regexp count:1 stable:yes`,
+			},
+			{
+				name:  "exclude repo, nonzero result",
+				query: `"func main() {\n" -repo:go-diff patterntype:regexp count:1 stable:yes`,
+			},
+			{
+				name:       "fork:no",
+				query:      "fork:no FORK_SENTINEL",
+				zeroResult: true,
+			},
+			{
+				name:       "random characters, zero results",
+				query:      "asdfalksd+jflaksjdfklas patterntype:literal -repo:sourcegraph",
+				zeroResult: true,
+			},
+			// Repo search
+			{
+				name:  "repo search by name, nonzero result",
+				query: "repo:go-diff$",
+			},
+			{
+				name:  "repo search by name, case yes, nonzero result",
+				query: `repo:^github\.com/sgtest/go-diff$ String case:yes count:1 stable:yes`,
+			},
+			{
+				name:  "true is an alias for yes when fork is set",
+				query: `repo:github\.com/sgtest/mux fork:true`,
+			},
+			{
+				name:  "non-master branch, nonzero result",
+				query: `repo:^github\.com/sgtest/java-langserver$@v1 void sendPartialResult(Object requestId, JsonPatch jsonPatch); patterntype:literal count:1 stable:yes`,
+			},
+			{
+				name:  "indexed multiline search, nonzero result",
+				query: `repo:^github\.com/sgtest/java-langserver$ \nimport index:only patterntype:regexp count:1 stable:yes`,
+			},
+			{
+				name:  "unindexed multiline search, nonzero result",
+				query: `repo:^github\.com/sgtest/java-langserver$ \nimport index:no patterntype:regexp count:1 stable:yes`,
+			},
+			{
+				name:       "random characters, zero result",
+				query:      `repo:^github\.com/sgtest/java-langserver$ doesnot734734743734743exist`,
+				zeroResult: true,
+			},
+			// Filename search
+			{
+				name:  "search for a known file",
+				query: "file:doc.go",
+			},
+			{
+				name:       "search for a non-existent file",
+				query:      "file:asdfasdf.go",
+				zeroResult: true,
+			},
+			// Symbol search
+			{
+				name:  "search for a known symbol",
+				query: "type:symbol count:100 patterntype:regexp ^newroute",
+			},
+			{
+				name:       "search for a non-existent symbol",
+				query:      "type:symbol asdfasdf",
+				zeroResult: true,
+			},
+			// Commit search
+			{
+				name:  "commit search, nonzero result",
+				query: `repo:^github\.com/sgtest/go-diff$ type:commit count:1`,
+			},
+			// Diff search
+			{
+				name:  "diff search, nonzero result",
+				query: `repo:^github\.com/sgtest/go-diff$ type:diff main count:1`,
 			},
 		}
 		for _, test := range tests {
@@ -256,84 +319,31 @@ func TestSearch(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if test.wantMaxResults != -1 && len(results.Results) > test.wantMaxResults {
-					t.Fatalf("Want results to be less than %d but got %d", test.wantMaxResults, len(results.Results))
-				} else if len(results.Results) < test.wantMinResults {
-					t.Fatalf("Want at least %d results but got %d", test.wantMinResults, len(results.Results))
-				} else if results.MatchCount < test.wantMinMatchCount {
-					t.Fatalf("Want at least %d match count but got %d", test.wantMinMatchCount, results.MatchCount)
+				if test.zeroResult {
+					if len(results.Results) > 0 {
+						t.Fatalf("Want zero result but got %d", len(results.Results))
+					}
+				} else {
+					if len(results.Results) == 0 {
+						t.Fatal("Want non-zero results but got 0")
+					}
+				}
+
+				if results.MatchCount < test.minMatchCount {
+					t.Fatalf("Want at least %d match count but got %d", test.minMatchCount, results.MatchCount)
 				}
 			})
 		}
 	})
 
-	t.Run("global filename search", func(t *testing.T) {
-		tests := []struct {
-			name           string
-			query          string
-			wantMinResults int
-			wantMaxResults int
-		}{
-			{
-				name:           "search for a non-existent file",
-				query:          "file:asdfasdf.go",
-				wantMaxResults: 0,
-			},
-			{
-				name:           "search for a known file",
-				query:          "file:doc.go",
-				wantMinResults: 4,
-				wantMaxResults: -1,
-			},
+	t.Run("timeout search options", func(t *testing.T) {
+		alert, err := client.SearchAlert(`router index:no timeout:1ns`)
+		if err != nil {
+			t.Fatal(err)
 		}
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				results, err := client.SearchFiles(test.query)
-				if err != nil {
-					t.Fatal(err)
-				}
 
-				if test.wantMaxResults != -1 && len(results.Results) > test.wantMaxResults {
-					t.Fatalf("Want results to be less than %d but got %d", test.wantMaxResults, len(results.Results))
-				} else if len(results.Results) < test.wantMinResults {
-					t.Fatalf("Want at least %d results but got %d", test.wantMinResults, len(results.Results))
-				}
-			})
-		}
-	})
-
-	t.Run("global symbol search", func(t *testing.T) {
-		tests := []struct {
-			name           string
-			query          string
-			wantMinResults int
-			wantMaxResults int
-		}{
-			{
-				name:           "search for a non-existent symbol",
-				query:          "type:symbol asdfasdf",
-				wantMaxResults: 0,
-			},
-			{
-				name:           "search for a known symbol",
-				query:          "type:symbol count:100 patterntype:regexp ^newroute",
-				wantMinResults: 1,
-				wantMaxResults: -1,
-			},
-		}
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				results, err := client.SearchFiles(test.query)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if test.wantMaxResults != -1 && len(results.Results) > test.wantMaxResults {
-					t.Fatalf("Want results to be less than %d but got %d", test.wantMaxResults, len(results.Results))
-				} else if len(results.Results) < test.wantMinResults {
-					t.Fatalf("Want at least %d results but got %d", test.wantMinResults, len(results.Results))
-				}
-			})
+		if alert == nil {
+			t.Fatal("Want search alert but got nil")
 		}
 	})
 }
