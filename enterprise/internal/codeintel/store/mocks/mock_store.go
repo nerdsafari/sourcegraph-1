@@ -182,7 +182,7 @@ func NewMockStore() *MockStore {
 			},
 		},
 		CalculateVisibleUploadsFunc: &StoreCalculateVisibleUploadsFunc{
-			defaultHook: func(context.Context, int, map[string][]string, string) error {
+			defaultHook: func(context.Context, int, map[string][]string, string, int) error {
 				return nil
 			},
 		},
@@ -698,24 +698,24 @@ func (c StoreAddUploadPartFuncCall) Results() []interface{} {
 // CalculateVisibleUploads method of the parent MockStore instance is
 // invoked.
 type StoreCalculateVisibleUploadsFunc struct {
-	defaultHook func(context.Context, int, map[string][]string, string) error
-	hooks       []func(context.Context, int, map[string][]string, string) error
+	defaultHook func(context.Context, int, map[string][]string, string, int) error
+	hooks       []func(context.Context, int, map[string][]string, string, int) error
 	history     []StoreCalculateVisibleUploadsFuncCall
 	mutex       sync.Mutex
 }
 
 // CalculateVisibleUploads delegates to the next hook function in the queue
 // and stores the parameter and result values of this invocation.
-func (m *MockStore) CalculateVisibleUploads(v0 context.Context, v1 int, v2 map[string][]string, v3 string) error {
-	r0 := m.CalculateVisibleUploadsFunc.nextHook()(v0, v1, v2, v3)
-	m.CalculateVisibleUploadsFunc.appendCall(StoreCalculateVisibleUploadsFuncCall{v0, v1, v2, v3, r0})
+func (m *MockStore) CalculateVisibleUploads(v0 context.Context, v1 int, v2 map[string][]string, v3 string, v4 int) error {
+	r0 := m.CalculateVisibleUploadsFunc.nextHook()(v0, v1, v2, v3, v4)
+	m.CalculateVisibleUploadsFunc.appendCall(StoreCalculateVisibleUploadsFuncCall{v0, v1, v2, v3, v4, r0})
 	return r0
 }
 
 // SetDefaultHook sets function that is called when the
 // CalculateVisibleUploads method of the parent MockStore instance is
 // invoked and the hook queue is empty.
-func (f *StoreCalculateVisibleUploadsFunc) SetDefaultHook(hook func(context.Context, int, map[string][]string, string) error) {
+func (f *StoreCalculateVisibleUploadsFunc) SetDefaultHook(hook func(context.Context, int, map[string][]string, string, int) error) {
 	f.defaultHook = hook
 }
 
@@ -723,7 +723,7 @@ func (f *StoreCalculateVisibleUploadsFunc) SetDefaultHook(hook func(context.Cont
 // CalculateVisibleUploads method of the parent MockStore instance inovkes
 // the hook at the front of the queue and discards it. After the queue is
 // empty, the default hook function is invoked for any future action.
-func (f *StoreCalculateVisibleUploadsFunc) PushHook(hook func(context.Context, int, map[string][]string, string) error) {
+func (f *StoreCalculateVisibleUploadsFunc) PushHook(hook func(context.Context, int, map[string][]string, string, int) error) {
 	f.mutex.Lock()
 	f.hooks = append(f.hooks, hook)
 	f.mutex.Unlock()
@@ -732,7 +732,7 @@ func (f *StoreCalculateVisibleUploadsFunc) PushHook(hook func(context.Context, i
 // SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
 // the given values.
 func (f *StoreCalculateVisibleUploadsFunc) SetDefaultReturn(r0 error) {
-	f.SetDefaultHook(func(context.Context, int, map[string][]string, string) error {
+	f.SetDefaultHook(func(context.Context, int, map[string][]string, string, int) error {
 		return r0
 	})
 }
@@ -740,12 +740,12 @@ func (f *StoreCalculateVisibleUploadsFunc) SetDefaultReturn(r0 error) {
 // PushReturn calls PushDefaultHook with a function that returns the given
 // values.
 func (f *StoreCalculateVisibleUploadsFunc) PushReturn(r0 error) {
-	f.PushHook(func(context.Context, int, map[string][]string, string) error {
+	f.PushHook(func(context.Context, int, map[string][]string, string, int) error {
 		return r0
 	})
 }
 
-func (f *StoreCalculateVisibleUploadsFunc) nextHook() func(context.Context, int, map[string][]string, string) error {
+func (f *StoreCalculateVisibleUploadsFunc) nextHook() func(context.Context, int, map[string][]string, string, int) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -790,6 +790,9 @@ type StoreCalculateVisibleUploadsFuncCall struct {
 	// Arg3 is the value of the 4th argument passed to this method
 	// invocation.
 	Arg3 string
+	// Arg4 is the value of the 5th argument passed to this method
+	// invocation.
+	Arg4 int
 	// Result0 is the value of the 1st result returned from this method
 	// invocation.
 	Result0 error
@@ -798,7 +801,7 @@ type StoreCalculateVisibleUploadsFuncCall struct {
 // Args returns an interface slice containing the arguments of this
 // invocation.
 func (c StoreCalculateVisibleUploadsFuncCall) Args() []interface{} {
-	return []interface{}{c.Arg0, c.Arg1, c.Arg2, c.Arg3}
+	return []interface{}{c.Arg0, c.Arg1, c.Arg2, c.Arg3, c.Arg4}
 }
 
 // Results returns an interface slice containing the results of this

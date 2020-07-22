@@ -13,6 +13,9 @@ import (
 // github.com/sourcegraph/sourcegraph/enterprise/internal/codeintel/commits)
 // used for unit testing.
 type MockUpdater struct {
+	// TryUpdateFunc is an instance of a mock function object controlling
+	// the behavior of the method TryUpdate.
+	TryUpdateFunc *UpdaterTryUpdateFunc
 	// UpdateFunc is an instance of a mock function object controlling the
 	// behavior of the method Update.
 	UpdateFunc *UpdaterUpdateFunc
@@ -22,8 +25,13 @@ type MockUpdater struct {
 // return zero values for all results, unless overwritten.
 func NewMockUpdater() *MockUpdater {
 	return &MockUpdater{
+		TryUpdateFunc: &UpdaterTryUpdateFunc{
+			defaultHook: func(context.Context, int, int) error {
+				return nil
+			},
+		},
 		UpdateFunc: &UpdaterUpdateFunc{
-			defaultHook: func(context.Context, int, bool, commits.CheckFunc) error {
+			defaultHook: func(context.Context, int, commits.CheckFunc) error {
 				return nil
 			},
 		},
@@ -34,32 +42,143 @@ func NewMockUpdater() *MockUpdater {
 // methods delegate to the given implementation, unless overwritten.
 func NewMockUpdaterFrom(i commits.Updater) *MockUpdater {
 	return &MockUpdater{
+		TryUpdateFunc: &UpdaterTryUpdateFunc{
+			defaultHook: i.TryUpdate,
+		},
 		UpdateFunc: &UpdaterUpdateFunc{
 			defaultHook: i.Update,
 		},
 	}
 }
 
+// UpdaterTryUpdateFunc describes the behavior when the TryUpdate method of
+// the parent MockUpdater instance is invoked.
+type UpdaterTryUpdateFunc struct {
+	defaultHook func(context.Context, int, int) error
+	hooks       []func(context.Context, int, int) error
+	history     []UpdaterTryUpdateFuncCall
+	mutex       sync.Mutex
+}
+
+// TryUpdate delegates to the next hook function in the queue and stores the
+// parameter and result values of this invocation.
+func (m *MockUpdater) TryUpdate(v0 context.Context, v1 int, v2 int) error {
+	r0 := m.TryUpdateFunc.nextHook()(v0, v1, v2)
+	m.TryUpdateFunc.appendCall(UpdaterTryUpdateFuncCall{v0, v1, v2, r0})
+	return r0
+}
+
+// SetDefaultHook sets function that is called when the TryUpdate method of
+// the parent MockUpdater instance is invoked and the hook queue is empty.
+func (f *UpdaterTryUpdateFunc) SetDefaultHook(hook func(context.Context, int, int) error) {
+	f.defaultHook = hook
+}
+
+// PushHook adds a function to the end of hook queue. Each invocation of the
+// TryUpdate method of the parent MockUpdater instance inovkes the hook at
+// the front of the queue and discards it. After the queue is empty, the
+// default hook function is invoked for any future action.
+func (f *UpdaterTryUpdateFunc) PushHook(hook func(context.Context, int, int) error) {
+	f.mutex.Lock()
+	f.hooks = append(f.hooks, hook)
+	f.mutex.Unlock()
+}
+
+// SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
+// the given values.
+func (f *UpdaterTryUpdateFunc) SetDefaultReturn(r0 error) {
+	f.SetDefaultHook(func(context.Context, int, int) error {
+		return r0
+	})
+}
+
+// PushReturn calls PushDefaultHook with a function that returns the given
+// values.
+func (f *UpdaterTryUpdateFunc) PushReturn(r0 error) {
+	f.PushHook(func(context.Context, int, int) error {
+		return r0
+	})
+}
+
+func (f *UpdaterTryUpdateFunc) nextHook() func(context.Context, int, int) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	if len(f.hooks) == 0 {
+		return f.defaultHook
+	}
+
+	hook := f.hooks[0]
+	f.hooks = f.hooks[1:]
+	return hook
+}
+
+func (f *UpdaterTryUpdateFunc) appendCall(r0 UpdaterTryUpdateFuncCall) {
+	f.mutex.Lock()
+	f.history = append(f.history, r0)
+	f.mutex.Unlock()
+}
+
+// History returns a sequence of UpdaterTryUpdateFuncCall objects describing
+// the invocations of this function.
+func (f *UpdaterTryUpdateFunc) History() []UpdaterTryUpdateFuncCall {
+	f.mutex.Lock()
+	history := make([]UpdaterTryUpdateFuncCall, len(f.history))
+	copy(history, f.history)
+	f.mutex.Unlock()
+
+	return history
+}
+
+// UpdaterTryUpdateFuncCall is an object that describes an invocation of
+// method TryUpdate on an instance of MockUpdater.
+type UpdaterTryUpdateFuncCall struct {
+	// Arg0 is the value of the 1st argument passed to this method
+	// invocation.
+	Arg0 context.Context
+	// Arg1 is the value of the 2nd argument passed to this method
+	// invocation.
+	Arg1 int
+	// Arg2 is the value of the 3rd argument passed to this method
+	// invocation.
+	Arg2 int
+	// Result0 is the value of the 1st result returned from this method
+	// invocation.
+	Result0 error
+}
+
+// Args returns an interface slice containing the arguments of this
+// invocation.
+func (c UpdaterTryUpdateFuncCall) Args() []interface{} {
+	return []interface{}{c.Arg0, c.Arg1, c.Arg2}
+}
+
+// Results returns an interface slice containing the results of this
+// invocation.
+func (c UpdaterTryUpdateFuncCall) Results() []interface{} {
+	return []interface{}{c.Result0}
+}
+
 // UpdaterUpdateFunc describes the behavior when the Update method of the
 // parent MockUpdater instance is invoked.
 type UpdaterUpdateFunc struct {
-	defaultHook func(context.Context, int, bool, commits.CheckFunc) error
-	hooks       []func(context.Context, int, bool, commits.CheckFunc) error
+	defaultHook func(context.Context, int, commits.CheckFunc) error
+	hooks       []func(context.Context, int, commits.CheckFunc) error
 	history     []UpdaterUpdateFuncCall
 	mutex       sync.Mutex
 }
 
 // Update delegates to the next hook function in the queue and stores the
 // parameter and result values of this invocation.
-func (m *MockUpdater) Update(v0 context.Context, v1 int, v2 bool, v3 commits.CheckFunc) error {
-	r0 := m.UpdateFunc.nextHook()(v0, v1, v2, v3)
-	m.UpdateFunc.appendCall(UpdaterUpdateFuncCall{v0, v1, v2, v3, r0})
+func (m *MockUpdater) Update(v0 context.Context, v1 int, v2 commits.CheckFunc) error {
+	r0 := m.UpdateFunc.nextHook()(v0, v1, v2)
+	m.UpdateFunc.appendCall(UpdaterUpdateFuncCall{v0, v1, v2, r0})
 	return r0
 }
 
 // SetDefaultHook sets function that is called when the Update method of the
 // parent MockUpdater instance is invoked and the hook queue is empty.
-func (f *UpdaterUpdateFunc) SetDefaultHook(hook func(context.Context, int, bool, commits.CheckFunc) error) {
+func (f *UpdaterUpdateFunc) SetDefaultHook(hook func(context.Context, int, commits.CheckFunc) error) {
 	f.defaultHook = hook
 }
 
@@ -67,7 +186,7 @@ func (f *UpdaterUpdateFunc) SetDefaultHook(hook func(context.Context, int, bool,
 // Update method of the parent MockUpdater instance inovkes the hook at the
 // front of the queue and discards it. After the queue is empty, the default
 // hook function is invoked for any future action.
-func (f *UpdaterUpdateFunc) PushHook(hook func(context.Context, int, bool, commits.CheckFunc) error) {
+func (f *UpdaterUpdateFunc) PushHook(hook func(context.Context, int, commits.CheckFunc) error) {
 	f.mutex.Lock()
 	f.hooks = append(f.hooks, hook)
 	f.mutex.Unlock()
@@ -76,7 +195,7 @@ func (f *UpdaterUpdateFunc) PushHook(hook func(context.Context, int, bool, commi
 // SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
 // the given values.
 func (f *UpdaterUpdateFunc) SetDefaultReturn(r0 error) {
-	f.SetDefaultHook(func(context.Context, int, bool, commits.CheckFunc) error {
+	f.SetDefaultHook(func(context.Context, int, commits.CheckFunc) error {
 		return r0
 	})
 }
@@ -84,12 +203,12 @@ func (f *UpdaterUpdateFunc) SetDefaultReturn(r0 error) {
 // PushReturn calls PushDefaultHook with a function that returns the given
 // values.
 func (f *UpdaterUpdateFunc) PushReturn(r0 error) {
-	f.PushHook(func(context.Context, int, bool, commits.CheckFunc) error {
+	f.PushHook(func(context.Context, int, commits.CheckFunc) error {
 		return r0
 	})
 }
 
-func (f *UpdaterUpdateFunc) nextHook() func(context.Context, int, bool, commits.CheckFunc) error {
+func (f *UpdaterUpdateFunc) nextHook() func(context.Context, int, commits.CheckFunc) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -130,10 +249,7 @@ type UpdaterUpdateFuncCall struct {
 	Arg1 int
 	// Arg2 is the value of the 3rd argument passed to this method
 	// invocation.
-	Arg2 bool
-	// Arg3 is the value of the 4th argument passed to this method
-	// invocation.
-	Arg3 commits.CheckFunc
+	Arg2 commits.CheckFunc
 	// Result0 is the value of the 1st result returned from this method
 	// invocation.
 	Result0 error
@@ -142,7 +258,7 @@ type UpdaterUpdateFuncCall struct {
 // Args returns an interface slice containing the arguments of this
 // invocation.
 func (c UpdaterUpdateFuncCall) Args() []interface{} {
-	return []interface{}{c.Arg0, c.Arg1, c.Arg2, c.Arg3}
+	return []interface{}{c.Arg0, c.Arg1, c.Arg2}
 }
 
 // Results returns an interface slice containing the results of this

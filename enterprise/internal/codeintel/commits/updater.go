@@ -13,7 +13,30 @@ import (
 // queries for a commit we are unaware of (a commit newer than our latest LSIF upload), and
 // after processing an upload for a repository.
 type Updater interface {
-	Update(ctx context.Context, repositoryID int, blocking bool, check CheckFunc) error
+	// Update pulls the commit graph for the given repository from gitserver, pulls the set of
+	// LSIF upload objects for the given repository from Postgres, and correlates them into a
+	// visibility graph. This graph is then upserted back into Postgres for use by find closest
+	// dumps queries.
+	//
+	// This method will block until an advisory lock can be acquired to give exclusive access
+	// to the update procedure for this repository. If a check function is supplied, it is called
+	// after acquiring the lock but before updating the commit graph. This can be used to check
+	// that an update is still necessary depending on the triggering conditions. Returning false
+	// from this function will cause the function to return without updating. A null function can
+	// be passed to skip this check.
+	Update(ctx context.Context, repositoryID int, check CheckFunc) error
+
+	// Update pulls the commit graph for the given repository from gitserver, pulls the set of
+	// LSIF upload objects for the given repository from Postgres, and correlates them into a
+	// visibility graph. This graph is then upserted back into Postgres for use by find closest
+	// dumps queries.
+	//
+	// This method will attempt to acquire an advisory lock to give exclusive access to the update
+	// procedure for this repository. If the lock is already held, this method will simply return
+	// early. The user should supply a dirty token that is associated with the given repository so
+	// that the repository can be unmarked as long as the repository is not marked as dirty again
+	// before the update completes.
+	TryUpdate(ctx context.Context, repositoryID, dirtyToken int) error
 }
 
 // CheckFunc is the shape of the function invoked to determine if an update is necessary
@@ -37,16 +60,14 @@ func NewUpdater(store store.Store, gitserverClient gitserver.Client) Updater {
 // visibility graph. This graph is then upserted back into Postgres for use by find closest
 // dumps queries.
 //
-// If blocking is true, then this method will wait for an advisory lock to be granted. If
-// blocking is false, this procedure will only be performed if the commit graph for this
-// repository is not being calculated by another service.
-//
-// If a check function is supplied, it is called after acquiring the lock but before updating
-// the commit graph. This can be used to check that an update is still necessary depending on
-// the triggering conditions. Returning false from this function will cause the function to
-// return without updating. A null function can be passed to skip this check.
-func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool, check CheckFunc) (err error) {
-	ok, unlock, err := u.store.Lock(ctx, repositoryID, blocking)
+// This method will block until an advisory lock can be acquired to give exclusive access
+// to the update procedure for this repository. If a check function is supplied, it is called
+// after acquiring the lock but before updating the commit graph. This can be used to check
+// that an update is still necessary depending on the triggering conditions. Returning false
+// from this function will cause the function to return without updating. A null function can
+// be passed to skip this check.
+func (u *updater) Update(ctx context.Context, repositoryID int, check CheckFunc) error {
+	ok, unlock, err := u.store.Lock(ctx, repositoryID, true)
 	if err != nil || !ok {
 		return errors.Wrap(err, "store.Lock")
 	}
@@ -60,18 +81,43 @@ func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool, c
 		}
 	}
 
-	graph, err := u.gitserverClient.CommitGraph(context.Background(), u.store, repositoryID)
+	return u.update(ctx, repositoryID, 0)
+}
+
+// Update pulls the commit graph for the given repository from gitserver, pulls the set of
+// LSIF upload objects for the given repository from Postgres, and correlates them into a
+// visibility graph. This graph is then upserted back into Postgres for use by find closest
+// dumps queries.
+//
+// This method will attempt to acquire an advisory lock to give exclusive access to the update
+// procedure for this repository. If the lock is already held, this method will simply return
+// early. The user should supply a dirty token that is associated with the given repository so
+// that the repository can be unmarked as long as the repository is not marked as dirty again
+// before the update completes.
+func (u *updater) TryUpdate(ctx context.Context, repositoryID, dirtyToken int) error {
+	ok, unlock, err := u.store.Lock(ctx, repositoryID, false)
+	if err != nil || !ok {
+		return errors.Wrap(err, "store.Lock")
+	}
+	defer func() {
+		err = unlock(err)
+	}()
+
+	return u.update(ctx, repositoryID, dirtyToken)
+}
+
+func (u *updater) update(ctx context.Context, repositoryID, dirtyToken int) error {
+	graph, err := u.gitserverClient.CommitGraph(ctx, u.store, repositoryID)
 	if err != nil {
 		return errors.Wrap(err, "gitserver.CommitGraph")
 	}
 
-	tipCommit, err := u.gitserverClient.Head(context.Background(), u.store, repositoryID)
+	tipCommit, err := u.gitserverClient.Head(ctx, u.store, repositoryID)
 	if err != nil {
 		return errors.Wrap(err, "gitserver.Head")
 	}
 
-	// TODO - supply
-	if err := u.store.CalculateVisibleUploads(context.Background(), repositoryID, graph, tipCommit, 0); err != nil {
+	if err := u.store.CalculateVisibleUploads(ctx, repositoryID, graph, tipCommit, dirtyToken); err != nil {
 		return errors.Wrap(err, "store.CalculateVisibleUploads")
 	}
 
