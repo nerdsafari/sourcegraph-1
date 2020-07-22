@@ -154,7 +154,8 @@ func scanFirstIntPair(rows *sql.Rows, queryErr error) (_ int, _ int, _ bool, err
 }
 
 // DeleteOldestDump deletes the oldest dump that is not currently visible at the tip of its repository's default branch.
-// This method returns the deleted dump's identifier and a flag indicating its (previous) existence.
+// This method returns the deleted dump's identifier and a flag indicating its (previous) existence. The associated repository
+// will be marked as dirty so that its commit graph will be updated in the background.
 func (s *store) DeleteOldestDump(ctx context.Context) (_ int, _ bool, err error) {
 	tx, err := s.transact(ctx)
 	if err != nil {

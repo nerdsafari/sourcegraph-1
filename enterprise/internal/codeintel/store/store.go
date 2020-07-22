@@ -95,7 +95,8 @@ type Store interface {
 	FindClosestDumps(ctx context.Context, repositoryID int, commit, path string, rootMustEnclosePath bool, indexer string) ([]Dump, error)
 
 	// DeleteOldestDump deletes the oldest dump that is not currently visible at the tip of its repository's default branch.
-	// This method returns the deleted dump's identifier and a flag indicating its (previous) existence.
+	// This method returns the deleted dump's identifier and a flag indicating its (previous) existence. The associated repository
+	// will be marked as dirty so that its commit graph will be updated in the background.
 	DeleteOldestDump(ctx context.Context) (int, bool, error)
 
 	// DeleteOverlapapingDumps deletes all completed uploads for the given repository with the same
