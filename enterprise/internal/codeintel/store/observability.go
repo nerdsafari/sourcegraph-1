@@ -611,10 +611,10 @@ func (s *ObservedStore) DirtyRepositories(ctx context.Context) (repositoryIDs []
 }
 
 // CalculateVisibleUploads calls into the inner store and registers the observed results.
-func (s *ObservedStore) CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) (err error) {
+func (s *ObservedStore) CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string, dirtyToken int) (err error) {
 	ctx, endObservation := s.fixCommitsOperation.With(ctx, &err, observation.Args{})
 	defer endObservation(1, observation.Args{})
-	return s.store.CalculateVisibleUploads(ctx, repositoryID, graph, tipCommit)
+	return s.store.CalculateVisibleUploads(ctx, repositoryID, graph, tipCommit, dirtyToken)
 }
 
 // IndexableRepositories calls into the inner store and registers the observed results.

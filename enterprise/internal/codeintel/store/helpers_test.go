@@ -262,6 +262,20 @@ func getVisibleUploads(t *testing.T, db *sql.DB, repositoryID int) map[string][]
 	return uploads
 }
 
+func getUploadsVisibleAtTip(t *testing.T, db *sql.DB, repositoryID int) []int {
+	query := sqlf.Sprintf(
+		`SELECT upload_id FROM lsif_uploads_visible_at_tip WHERE repository_id = %s ORDER BY upload_id`,
+		repositoryID,
+	)
+
+	ids, err := scanInts(db.QueryContext(context.Background(), query.Query(sqlf.PostgresBindVar), query.Args()...))
+	if err != nil {
+		t.Fatalf("unexpected error getting uploads visible at tip: %s", err)
+	}
+
+	return ids
+}
+
 func normalizeVisibleUploads(uploads map[string][]UploadMeta) map[string][]UploadMeta {
 	for _, metas := range uploads {
 		sort.Slice(metas, func(i, j int) bool {

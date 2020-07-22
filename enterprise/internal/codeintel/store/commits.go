@@ -63,22 +63,26 @@ func (s *store) MarkRepositoryAsDirty(ctx context.Context, repositoryID int) err
 	return s.queryForEffect(
 		ctx,
 		sqlf.Sprintf(`
-			INSERT INTO lsif_dirty_repositories (repository_id, dirty)
-			VALUES (%s, true)
-			ON CONFLICT (repository_id) DO UPDATE SET dirty = true
+			INSERT INTO lsif_dirty_repositories (repository_id, dirty_token, update_token)
+			VALUES (%s, 1, 0)
+			ON CONFLICT (repository_id) DO UPDATE SET dirty_token = lsif_dirty_repositories.dirty_token + 1
 		`, repositoryID),
 	)
 }
 
 // DirtyRepositories returns the set of identifiers for repositories whose commit graphs are out of date.
 func (s *store) DirtyRepositories(ctx context.Context) ([]int, error) {
-	return scanInts(s.query(ctx, sqlf.Sprintf(`SELECT repository_id FROM lsif_dirty_repositories WHERE dirty = true`)))
+	return scanInts(s.query(ctx, sqlf.Sprintf(`SELECT repository_id FROM lsif_dirty_repositories WHERE dirty_token > update_token`)))
 }
 
 // CalculateVisibleUploads uses the given commit graph and the tip commit of the default branch to determine
 // the set of LSIF uploads that are visible for each commit, and the set of uploads which are visible at the
 // tip. The decorated commit graph is serialized to Postgres for use by find closest dumps queries.
-func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string) error {
+//
+// If dirtyToken is supplied, the dirty flag for the repository will be cleared. If the supplied token does
+// not match the token stored in the database, the flag will not be cleared as another request for update has
+// come in since this token has been read.
+func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string, dirtyToken int) error {
 	tx, err := s.transact(ctx)
 	if err != nil {
 		return err
@@ -161,17 +165,17 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 		}
 	}
 
-	// TODO - ensure some token matches
-	// We just updated the repository commit graph so we can clear its dirty flag.
-	if err := tx.queryForEffect(
-		ctx,
-		sqlf.Sprintf(`
-			INSERT INTO lsif_dirty_repositories (repository_id, dirty, last_updated_at)
-			VALUES (%s, false, clock_timestamp())
-			ON CONFLICT (repository_id) DO UPDATE SET dirty = false, last_updated_at = clock_timestamp()
-		`, repositoryID),
-	); err != nil {
-		return err
+	if dirtyToken != 0 {
+		if err := tx.queryForEffect(
+			ctx,
+			sqlf.Sprintf(`
+				UPDATE lsif_dirty_repositories
+				SET update_token = MAX(update_token, %s)
+				WHERE repository_id = %s
+			`, dirtyToken, repositoryID),
+		); err != nil {
+			return err
+		}
 	}
 
 	return nil

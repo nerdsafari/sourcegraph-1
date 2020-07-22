@@ -70,7 +70,8 @@ func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool, c
 		return errors.Wrap(err, "gitserver.Head")
 	}
 
-	if err := u.store.CalculateVisibleUploads(context.Background(), repositoryID, graph, tipCommit); err != nil {
+	// TODO - supply
+	if err := u.store.CalculateVisibleUploads(context.Background(), repositoryID, graph, tipCommit, 0); err != nil {
 		return errors.Wrap(err, "store.CalculateVisibleUploads")
 	}
 

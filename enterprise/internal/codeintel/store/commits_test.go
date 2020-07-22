@@ -133,7 +133,7 @@ func TestCalculateVisibleUploads(t *testing.T) {
 		makeCommit(8): {makeCommit(6)},
 	}
 
-	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, "7"); err != nil {
+	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, makeCommit(8), 0); err != nil {
 		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
 	}
 
@@ -151,7 +151,10 @@ func TestCalculateVisibleUploads(t *testing.T) {
 		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
 	}
 
-	// TODO - test visible at tip
+	if diff := cmp.Diff([]int{1}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
+		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
+	}
+
 	// TODO - test dirty flag
 }
 
@@ -186,7 +189,7 @@ func TestCalculateVisibleUploadsAlternateCommitGraph(t *testing.T) {
 		makeCommit(8): {makeCommit(7)},
 	}
 
-	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, "3"); err != nil {
+	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, makeCommit(3), 0); err != nil {
 		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
 	}
 
@@ -199,7 +202,10 @@ func TestCalculateVisibleUploadsAlternateCommitGraph(t *testing.T) {
 		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
 	}
 
-	// TODO - test visible at tip
+	if diff := cmp.Diff([]int{1}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
+		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
+	}
+
 	// TODO - test dirty flag
 }
 
@@ -225,7 +231,7 @@ func TestCalculateVisibleUploadsDistinctRoots(t *testing.T) {
 		makeCommit(2): {makeCommit(1)},
 	}
 
-	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, "2"); err != nil {
+	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, makeCommit(2), 0); err != nil {
 		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
 	}
 
@@ -237,7 +243,10 @@ func TestCalculateVisibleUploadsDistinctRoots(t *testing.T) {
 		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
 	}
 
-	// TODO - test visible at tip
+	if diff := cmp.Diff([]int{1, 2}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
+		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
+	}
+
 	// TODO - test dirty flag
 }
 
@@ -290,7 +299,7 @@ func TestCalculateVisibleUploadsOverlappingRoots(t *testing.T) {
 		makeCommit(6): {makeCommit(5)},
 	}
 
-	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, "6"); err != nil {
+	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, makeCommit(6), 0); err != nil {
 		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
 	}
 
@@ -306,7 +315,10 @@ func TestCalculateVisibleUploadsOverlappingRoots(t *testing.T) {
 		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
 	}
 
-	// TODO - test visible at tip
+	if diff := cmp.Diff([]int{1, 2, 7, 8, 9}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
+		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
+	}
+
 	// TODO - test dirty flag
 }
 
@@ -341,7 +353,7 @@ func TestCalculateVisibleUploadsIndexerName(t *testing.T) {
 		makeCommit(5): {makeCommit(4)},
 	}
 
-	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, "6"); err != nil {
+	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, makeCommit(5), 0); err != nil {
 		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
 	}
 
@@ -371,6 +383,9 @@ func TestCalculateVisibleUploadsIndexerName(t *testing.T) {
 		t.Errorf("unexpected visible uploads (-want +got):\n%s", diff)
 	}
 
-	// TODO - test visible at tip
+	if diff := cmp.Diff([]int{1, 2, 3, 4, 5, 6, 7, 8}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
+		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
+	}
+
 	// TODO - test dirty flag
 }
