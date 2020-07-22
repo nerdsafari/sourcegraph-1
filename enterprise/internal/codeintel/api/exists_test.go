@@ -23,6 +23,7 @@ func TestFindClosestDumps(t *testing.T) {
 	mockGitserverClient := gitservermocks.NewMockClient()
 	mockCommitUpdater := commitmocks.NewMockUpdater()
 
+	setMockStoreHasRepository(t, mockStore, 42, true)
 	setMockStoreFindClosestDumps(t, mockStore, 42, testCommit, "s1/main.go", true, "idx", []store.Dump{
 		{ID: 50, Root: "s1/"},
 		{ID: 51, Root: "s1/"},
@@ -63,7 +64,7 @@ func TestFindClosestDumps(t *testing.T) {
 	}
 }
 
-func TestFindClosestSkipsGitserverIfCommitIsKnown(t *testing.T) {
+func TestFindClosestSkipsCommitGraphUpdateIfCommitIsKnown(t *testing.T) {
 	mockStore := storemocks.NewMockStore()
 	mockBundleManagerClient := bundlemocks.NewMockBundleManagerClient()
 	mockBundleClient := bundlemocks.NewMockBundleClient()
@@ -91,6 +92,31 @@ func TestFindClosestSkipsGitserverIfCommitIsKnown(t *testing.T) {
 	}
 
 	if len(mockCommitUpdater.UpdateFunc.History()) != 0 {
-		t.Errorf("expected commitUpdater.UpdateFunc not to be called")
+		t.Errorf("expected commitUpdater.Update not to be called")
+	}
+}
+
+func TestFindClosestSkipsCommitGraphUpdateIfRepositoryIsUnknown(t *testing.T) {
+	mockStore := storemocks.NewMockStore()
+	mockBundleManagerClient := bundlemocks.NewMockBundleManagerClient()
+	mockGitserverClient := gitservermocks.NewMockClient()
+	mockCommitUpdater := commitmocks.NewMockUpdater()
+
+	setMockStoreHasRepository(t, mockStore, 42, false)
+
+	api := New(mockStore, mockBundleManagerClient, mockGitserverClient, mockCommitUpdater)
+	dumps, err := api.FindClosestDumps(context.Background(), 42, testCommit, "main.go", true, "idx")
+	if err != nil {
+		t.Fatalf("unexpected error finding closest dumps: %s", err)
+	}
+	if len(dumps) != 0 {
+		t.Errorf("unexpected dumps")
+	}
+
+	if len(mockStore.FindClosestDumpsFunc.History()) != 0 {
+		t.Errorf("expected store.FindClosestDumps not to be called")
+	}
+	if len(mockCommitUpdater.UpdateFunc.History()) != 0 {
+		t.Errorf("expected commitUpdater.Update not to be called")
 	}
 }

@@ -16,30 +16,9 @@ import (
 // path is a prefix are returned. These dump IDs should be subsequently passed to invocations of
 // Definitions, References, and Hover.
 func (api *codeIntelAPI) FindClosestDumps(ctx context.Context, repositoryID int, commit, path string, exactPath bool, indexer string) ([]store.Dump, error) {
-	// TODO - can collapse hascommit/hasrepository?
-	// TODO - extract and test this stuff
-	// TODO - document better
-
-	commitExists, err := api.store.HasCommit(ctx, repositoryID, commit)
-	if err != nil {
-		return nil, errors.Wrap(err, "store.HasCommit")
-	}
-	if !commitExists {
-		repositoryExists, err := api.store.HasRepository(ctx, repositoryID)
-		if err != nil {
-			return nil, errors.Wrap(err, "store.HasRepository")
-		}
-		if !repositoryExists {
-			return nil, nil
-		}
-
-		// If we are not aware of this commit, we need to update our commits table and the
-		// visibility of the dumps in this repository.
-		if err := api.commitUpdater.Update(ctx, repositoryID, true, func(ctx context.Context) (bool, error) {
-			return api.store.HasCommit(ctx, repositoryID, commit)
-		}); err != nil {
-			return nil, errors.Wrap(err, "commitUpdater.Update")
-		}
+	ok, err := api.updateCommitGraph(ctx, repositoryID, commit)
+	if err != nil || !ok {
+		return nil, err
 	}
 
 	// The parameters exactPath and rootMustEnclosePath align here: if we're looking for dumps
@@ -74,4 +53,37 @@ func (api *codeIntelAPI) FindClosestDumps(ctx context.Context, repositoryID int,
 	}
 
 	return dumps, nil
+}
+
+// updateCommitGraph will perform an update of the given repository's commit graph if it appears to be out
+// of date. If we know already know about this commit, we do not perform an update. Otherwise, it is likely
+// that a user is browsing a commit that was pushed after commit that owns the last index we processed. If
+// the repository has no index data at all, we skip the update and return false as there would be no useful
+// information available in the commit graph.
+func (api *codeIntelAPI) updateCommitGraph(ctx context.Context, repositoryID int, commit string) (bool, error) {
+	commitExists, err := api.store.HasCommit(ctx, repositoryID, commit)
+	if err != nil {
+		return false, errors.Wrap(err, "store.HasCommit")
+	}
+	if commitExists {
+		return true, nil
+	}
+
+	repositoryExists, err := api.store.HasRepository(ctx, repositoryID)
+	if err != nil {
+		return false, errors.Wrap(err, "store.HasRepository")
+	}
+	if !repositoryExists {
+		return false, nil
+	}
+
+	// If we are not aware of this commit, we need to update our commits table and the
+	// visibility of the dumps in this repository.
+	if err := api.commitUpdater.Update(ctx, repositoryID, true, func(ctx context.Context) (bool, error) {
+		return api.store.HasCommit(ctx, repositoryID, commit)
+	}); err != nil {
+		return false, errors.Wrap(err, "commitUpdater.Update")
+	}
+
+	return true, nil
 }
