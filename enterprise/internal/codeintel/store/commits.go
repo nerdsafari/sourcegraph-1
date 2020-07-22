@@ -96,13 +96,13 @@ func (s *store) DirtyRepositories(ctx context.Context) (map[int]int, error) {
 	return scanIntPairs(s.query(ctx, sqlf.Sprintf(`SELECT repository_id, dirty_token FROM lsif_dirty_repositories WHERE dirty_token > update_token`)))
 }
 
-// CalculateVisibleUploads uses the given commit graph and the tip commit of the default branch to determine
-// the set of LSIF uploads that are visible for each commit, and the set of uploads which are visible at the
-// tip. The decorated commit graph is serialized to Postgres for use by find closest dumps queries.
+// CalculateVisibleUploads uses the given commit graph and the tip commit of the default branch to determine the set
+// of LSIF uploads that are visible for each commit, and the set of uploads which are visible at the tip. The decorated
+// commit graph is serialized to Postgres for use by find closest dumps queries.
 //
-// If dirtyToken is supplied, the dirty flag for the repository will be cleared. If the supplied token does
-// not match the token stored in the database, the flag will not be cleared as another request for update has
-// come in since this token has been read.
+// If dirtyToken is supplied, the repository will be unmarked when the supplied token does matches the most recent
+// token stored in the database, the flag will not be cleared as another request for update has come in since this
+// token has been read.
 func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, graph map[string][]string, tipCommit string, dirtyToken int) error {
 	tx, err := s.transact(ctx)
 	if err != nil {
@@ -187,14 +187,15 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 	}
 
 	if dirtyToken != 0 {
-		if err := tx.queryForEffect(
-			ctx,
-			sqlf.Sprintf(`
-				UPDATE lsif_dirty_repositories
-				SET update_token = MAX(update_token, %s)
-				WHERE repository_id = %s
-			`, dirtyToken, repositoryID),
-		); err != nil {
+		// If the user requests us to clear a dirty token, set the updated_token value to
+		// the dirty token if it wouldn't decrease the value. Dirty repositories are determined
+		// by having a non-equal dirty and update token, and we want the most recent upload
+		// token to win this write.
+		if err := tx.queryForEffect(ctx, sqlf.Sprintf(
+			`UPDATE lsif_dirty_repositories SET update_token = GREATEST(update_token, %s) WHERE repository_id = %s`,
+			dirtyToken,
+			repositoryID,
+		)); err != nil {
 			return err
 		}
 	}

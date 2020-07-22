@@ -159,8 +159,6 @@ func TestCalculateVisibleUploads(t *testing.T) {
 	if diff := cmp.Diff([]int{1}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
 		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
 	}
-
-	// TODO - test dirty flag
 }
 
 func TestCalculateVisibleUploadsAlternateCommitGraph(t *testing.T) {
@@ -210,8 +208,6 @@ func TestCalculateVisibleUploadsAlternateCommitGraph(t *testing.T) {
 	if diff := cmp.Diff([]int{1}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
 		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
 	}
-
-	// TODO - test dirty flag
 }
 
 func TestCalculateVisibleUploadsDistinctRoots(t *testing.T) {
@@ -251,8 +247,6 @@ func TestCalculateVisibleUploadsDistinctRoots(t *testing.T) {
 	if diff := cmp.Diff([]int{1, 2}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
 		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
 	}
-
-	// TODO - test dirty flag
 }
 
 func TestCalculateVisibleUploadsOverlappingRoots(t *testing.T) {
@@ -323,8 +317,6 @@ func TestCalculateVisibleUploadsOverlappingRoots(t *testing.T) {
 	if diff := cmp.Diff([]int{1, 2, 7, 8, 9}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
 		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
 	}
-
-	// TODO - test dirty flag
 }
 
 func TestCalculateVisibleUploadsIndexerName(t *testing.T) {
@@ -391,6 +383,60 @@ func TestCalculateVisibleUploadsIndexerName(t *testing.T) {
 	if diff := cmp.Diff([]int{1, 2, 3, 4, 5, 6, 7, 8}, getUploadsVisibleAtTip(t, dbconn.Global, 50)); diff != "" {
 		t.Errorf("unexpected uploads visible at tip (-want +got):\n%s", diff)
 	}
+}
 
-	// TODO - test dirty flag
+func TestCalculateVisibleUploadsResetsDirtyFlag(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	dbtesting.SetupGlobalTestDB(t)
+	store := testStore()
+
+	uploads := []Upload{
+		{ID: 1, Commit: makeCommit(1)},
+		{ID: 2, Commit: makeCommit(2)},
+		{ID: 3, Commit: makeCommit(3)},
+	}
+	insertUploads(t, dbconn.Global, uploads...)
+
+	graph := map[string][]string{
+		makeCommit(1): {},
+		makeCommit(2): {makeCommit(1)},
+		makeCommit(3): {makeCommit(2)},
+	}
+
+	for i := 0; i < 3; i++ {
+		// Set dirty token to 3
+		if err := store.MarkRepositoryAsDirty(context.Background(), 50); err != nil {
+			t.Fatalf("unexpected error marking repository as dirty: %s", err)
+		}
+	}
+
+	// Non-latest dirty token - should not clear flag
+	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, makeCommit(3), 2); err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+
+	repositoryIDs, err := store.DirtyRepositories(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error listing dirty repositories: %s", err)
+	}
+
+	if len(repositoryIDs) == 0 {
+		t.Errorf("did not expect repository to be unmarked")
+	}
+
+	// Latest dirty token - should clear flag
+	if err := store.CalculateVisibleUploads(context.Background(), 50, graph, makeCommit(3), 3); err != nil {
+		t.Fatalf("unexpected error while calculating visible uploads: %s", err)
+	}
+
+	repositoryIDs, err = store.DirtyRepositories(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error listing dirty repositories: %s", err)
+	}
+
+	if len(repositoryIDs) != 0 {
+		t.Errorf("expected repository to be unmarked")
+	}
 }
