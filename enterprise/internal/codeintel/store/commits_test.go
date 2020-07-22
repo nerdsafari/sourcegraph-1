@@ -95,9 +95,14 @@ func TestMarkRepositoryAsDirty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error listing dirty repositories: %s", err)
 	}
-	sort.Ints(repositoryIDs)
 
-	if diff := cmp.Diff([]int{50, 51, 52}, repositoryIDs); diff != "" {
+	var keys []int
+	for repositoryID := range repositoryIDs {
+		keys = append(keys, repositoryID)
+	}
+	sort.Ints(keys)
+
+	if diff := cmp.Diff([]int{50, 51, 52}, keys); diff != "" {
 		t.Errorf("unexpected repository ids (-want +got):\n%s", diff)
 	}
 }

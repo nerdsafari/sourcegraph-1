@@ -60,8 +60,8 @@ loop:
 			log15.Error("Failed to retrieve dirty repositories", "err", err)
 		}
 
-		for _, repositoryID := range repositoryIDs {
-			if err := u.updater.Update(context.Background(), repositoryID, false, nil); err != nil {
+		for repositoryID, dirtyFlag := range repositoryIDs {
+			if err := u.updater.Update(context.Background(), repositoryID, dirtyFlag); err != nil {
 				for ex := err; ex != nil; ex = errors.Unwrap(ex) {
 					if err == u.ctx.Err() {
 						break loop

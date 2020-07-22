@@ -604,7 +604,7 @@ func (s *ObservedStore) MarkRepositoryAsDirty(ctx context.Context, repositoryID 
 }
 
 // DirtyRepositories calls into the inner store and registers the observed results.
-func (s *ObservedStore) DirtyRepositories(ctx context.Context) (repositoryIDs []int, err error) {
+func (s *ObservedStore) DirtyRepositories(ctx context.Context) (repositoryIDs map[int]int, err error) {
 	ctx, endObservation := s.dirtyRepositoriesOperation.With(ctx, &err, observation.Args{})
 	defer func() { endObservation(float64(len(repositoryIDs)), observation.Args{}) }()
 	return s.store.DirtyRepositories(ctx)

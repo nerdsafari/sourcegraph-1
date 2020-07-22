@@ -131,8 +131,9 @@ type Store interface {
 	// MarkRepositoryAsDirty marks the given repository's commit graph as out of date.
 	MarkRepositoryAsDirty(ctx context.Context, repositoryID int) error
 
-	// DirtyRepositories returns the set of identifiers for repositories whose commit graphs are out of date.
-	DirtyRepositories(ctx context.Context) ([]int, error)
+	// DirtyRepositories returns a map from repository identifiers to a dirty token for each repository whose commit
+	// graph is out of date. This token should be passed to CalculateVisibleUploads in order to unmark the repository.
+	DirtyRepositories(ctx context.Context) (map[int]int, error)
 
 	// CalculateVisibleUploads uses the given commit graph and the tip commit of the default branch to determine
 	// the set of LSIF uploads that are visible for each commit, and the set of uploads which are visible at the

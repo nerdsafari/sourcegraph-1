@@ -70,9 +70,30 @@ func (s *store) MarkRepositoryAsDirty(ctx context.Context, repositoryID int) err
 	)
 }
 
-// DirtyRepositories returns the set of identifiers for repositories whose commit graphs are out of date.
-func (s *store) DirtyRepositories(ctx context.Context) ([]int, error) {
-	return scanInts(s.query(ctx, sqlf.Sprintf(`SELECT repository_id FROM lsif_dirty_repositories WHERE dirty_token > update_token`)))
+func scanIntPairs(rows *sql.Rows, queryErr error) (_ map[int]int, err error) {
+	if queryErr != nil {
+		return nil, queryErr
+	}
+	defer func() { err = closeRows(rows, err) }()
+
+	values := map[int]int{}
+	if rows.Next() {
+		var value1 int
+		var value2 int
+		if err := rows.Scan(&value1, &value2); err != nil {
+			return nil, err
+		}
+
+		values[value1] = value2
+	}
+
+	return values, nil
+}
+
+// DirtyRepositories returns a map from repository identifiers to a dirty token for each repository whose commit
+// graph is out of date. This token should be passed to CalculateVisibleUploads in order to unmark the repository.
+func (s *store) DirtyRepositories(ctx context.Context) (map[int]int, error) {
+	return scanIntPairs(s.query(ctx, sqlf.Sprintf(`SELECT repository_id, dirty_token FROM lsif_dirty_repositories WHERE dirty_token > update_token`)))
 }
 
 // CalculateVisibleUploads uses the given commit graph and the tip commit of the default branch to determine

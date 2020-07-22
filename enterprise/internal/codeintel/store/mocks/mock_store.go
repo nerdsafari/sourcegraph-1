@@ -227,7 +227,7 @@ func NewMockStore() *MockStore {
 			},
 		},
 		DirtyRepositoriesFunc: &StoreDirtyRepositoriesFunc{
-			defaultHook: func(context.Context) ([]int, error) {
+			defaultHook: func(context.Context) (map[int]int, error) {
 				return nil, nil
 			},
 		},
@@ -1705,15 +1705,15 @@ func (c StoreDequeueIndexFuncCall) Results() []interface{} {
 // StoreDirtyRepositoriesFunc describes the behavior when the
 // DirtyRepositories method of the parent MockStore instance is invoked.
 type StoreDirtyRepositoriesFunc struct {
-	defaultHook func(context.Context) ([]int, error)
-	hooks       []func(context.Context) ([]int, error)
+	defaultHook func(context.Context) (map[int]int, error)
+	hooks       []func(context.Context) (map[int]int, error)
 	history     []StoreDirtyRepositoriesFuncCall
 	mutex       sync.Mutex
 }
 
 // DirtyRepositories delegates to the next hook function in the queue and
 // stores the parameter and result values of this invocation.
-func (m *MockStore) DirtyRepositories(v0 context.Context) ([]int, error) {
+func (m *MockStore) DirtyRepositories(v0 context.Context) (map[int]int, error) {
 	r0, r1 := m.DirtyRepositoriesFunc.nextHook()(v0)
 	m.DirtyRepositoriesFunc.appendCall(StoreDirtyRepositoriesFuncCall{v0, r0, r1})
 	return r0, r1
@@ -1722,7 +1722,7 @@ func (m *MockStore) DirtyRepositories(v0 context.Context) ([]int, error) {
 // SetDefaultHook sets function that is called when the DirtyRepositories
 // method of the parent MockStore instance is invoked and the hook queue is
 // empty.
-func (f *StoreDirtyRepositoriesFunc) SetDefaultHook(hook func(context.Context) ([]int, error)) {
+func (f *StoreDirtyRepositoriesFunc) SetDefaultHook(hook func(context.Context) (map[int]int, error)) {
 	f.defaultHook = hook
 }
 
@@ -1730,7 +1730,7 @@ func (f *StoreDirtyRepositoriesFunc) SetDefaultHook(hook func(context.Context) (
 // DirtyRepositories method of the parent MockStore instance inovkes the
 // hook at the front of the queue and discards it. After the queue is empty,
 // the default hook function is invoked for any future action.
-func (f *StoreDirtyRepositoriesFunc) PushHook(hook func(context.Context) ([]int, error)) {
+func (f *StoreDirtyRepositoriesFunc) PushHook(hook func(context.Context) (map[int]int, error)) {
 	f.mutex.Lock()
 	f.hooks = append(f.hooks, hook)
 	f.mutex.Unlock()
@@ -1738,21 +1738,21 @@ func (f *StoreDirtyRepositoriesFunc) PushHook(hook func(context.Context) ([]int,
 
 // SetDefaultReturn calls SetDefaultDefaultHook with a function that returns
 // the given values.
-func (f *StoreDirtyRepositoriesFunc) SetDefaultReturn(r0 []int, r1 error) {
-	f.SetDefaultHook(func(context.Context) ([]int, error) {
+func (f *StoreDirtyRepositoriesFunc) SetDefaultReturn(r0 map[int]int, r1 error) {
+	f.SetDefaultHook(func(context.Context) (map[int]int, error) {
 		return r0, r1
 	})
 }
 
 // PushReturn calls PushDefaultHook with a function that returns the given
 // values.
-func (f *StoreDirtyRepositoriesFunc) PushReturn(r0 []int, r1 error) {
-	f.PushHook(func(context.Context) ([]int, error) {
+func (f *StoreDirtyRepositoriesFunc) PushReturn(r0 map[int]int, r1 error) {
+	f.PushHook(func(context.Context) (map[int]int, error) {
 		return r0, r1
 	})
 }
 
-func (f *StoreDirtyRepositoriesFunc) nextHook() func(context.Context) ([]int, error) {
+func (f *StoreDirtyRepositoriesFunc) nextHook() func(context.Context) (map[int]int, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -1790,7 +1790,7 @@ type StoreDirtyRepositoriesFuncCall struct {
 	Arg0 context.Context
 	// Result0 is the value of the 1st result returned from this method
 	// invocation.
-	Result0 []int
+	Result0 map[int]int
 	// Result1 is the value of the 2nd result returned from this method
 	// invocation.
 	Result1 error
