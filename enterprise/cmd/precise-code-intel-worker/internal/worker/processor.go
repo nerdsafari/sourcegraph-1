@@ -178,6 +178,7 @@ func (p *processor) write(ctx context.Context, dirname string, groupedBundleData
 	return err
 }
 
+// TODO(efritz) - refactor/simplify this after last change
 func (p *processor) updateXrepoData(ctx context.Context, store store.Store, upload store.Upload, packages []types.Package, packageReferences []types.PackageReference) (err error) {
 	ctx, endOperation := p.metrics.UpdateXrepoDatabaseOperation.With(ctx, &err, observation.Args{})
 	defer endOperation(1, observation.Args{})
@@ -190,17 +191,12 @@ func (p *processor) updateXrepoData(ctx context.Context, store store.Store, uplo
 		return errors.Wrap(err, "store.UpdatePackageReferences")
 	}
 
-	// TODO - this deadlocks, need to rearrange things
 	// Before we mark the upload as complete, we need to delete any existing completed uploads
 	// that have the same repository_id, commit, root, and indexer values. Otherwise the transaction
 	// will fail as these values form a unique constraint.
 	if err := store.DeleteOverlappingDumps(ctx, upload.RepositoryID, upload.Commit, upload.Root, upload.Indexer); err != nil {
 		return errors.Wrap(err, "store.DeleteOverlappingDumps")
 	}
-
-	//
-	// TODO - can simplify this flow now!
-	//
 
 	// Almost-success: we need to mark this upload as complete at this point as the next step changes
 	// the visibility of the dumps for this repository. This requires that the new dump be available in
