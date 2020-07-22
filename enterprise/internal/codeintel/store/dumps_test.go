@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -473,7 +474,13 @@ func TestDeleteOldestDump(t *testing.T) {
 		t.Fatalf("unexpected error listing dirty repositories: %s", err)
 	}
 
-	if len(repositoryIDs) != 1 || repositoryIDs[0] != 50 {
+	var keys []int
+	for repositoryID := range repositoryIDs {
+		keys = append(keys, repositoryID)
+	}
+	sort.Ints(keys)
+
+	if len(keys) != 1 || keys[0] != 50 {
 		t.Errorf("expected repository to be marked dirty")
 	}
 

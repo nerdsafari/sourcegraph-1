@@ -77,7 +77,7 @@ func scanIntPairs(rows *sql.Rows, queryErr error) (_ map[int]int, err error) {
 	defer func() { err = closeRows(rows, err) }()
 
 	values := map[int]int{}
-	if rows.Next() {
+	for rows.Next() {
 		var value1 int
 		var value2 int
 		if err := rows.Scan(&value1, &value2); err != nil {
