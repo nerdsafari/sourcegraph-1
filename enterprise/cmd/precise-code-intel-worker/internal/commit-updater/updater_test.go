@@ -17,22 +17,30 @@ func TestUpdater(t *testing.T) {
 		Interval: time.Second,
 	}
 
-	store.DirtyRepositoriesFunc.SetDefaultReturn([]int{50, 51, 52}, nil)
+	store.DirtyRepositoriesFunc.SetDefaultReturn(map[int]int{50: 3, 51: 2, 52: 6}, nil)
 
 	periodicUpdater := newUpdater(store, updater, options, clock)
 	go func() { periodicUpdater.Start() }()
 	clock.BlockingAdvance(time.Second)
 	periodicUpdater.Stop()
 
-	if callCount := len(updater.UpdateFunc.History()); callCount < 3 {
+	if callCount := len(updater.TryUpdateFunc.History()); callCount < 3 {
 		t.Errorf("unexpected update call count. want>=%d have=%d", 3, callCount)
 	} else {
-		for i, repositoryID := range []int{50, 51, 52} {
-			if updater.UpdateFunc.History()[i].Arg1 != repositoryID {
-				t.Errorf("unexpected repository id arg. want=%d have=%d", repositoryID, updater.UpdateFunc.History()[0].Arg1)
+		testCases := []struct {
+			repositoryID int
+			dirtyFlag    int
+		}{
+			{50, 3},
+			{51, 2},
+			{52, 6},
+		}
+		for i, testCase := range testCases {
+			if updater.TryUpdateFunc.History()[i].Arg1 != testCase.repositoryID {
+				t.Errorf("unexpected repository id arg. want=%d have=%d", testCase.repositoryID, updater.TryUpdateFunc.History()[0].Arg1)
 			}
-			if updater.UpdateFunc.History()[i].Arg2 {
-				t.Errorf("unexpected blocking arg. want=%v have=%v", false, updater.UpdateFunc.History()[0].Arg2)
+			if updater.TryUpdateFunc.History()[i].Arg2 != testCase.dirtyFlag {
+				t.Errorf("unexpected dirty flag arg. want=%d have=%d", testCase.dirtyFlag, updater.TryUpdateFunc.History()[0].Arg2)
 			}
 		}
 	}

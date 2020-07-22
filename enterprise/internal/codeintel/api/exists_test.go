@@ -59,8 +59,6 @@ func TestFindClosestDumps(t *testing.T) {
 		t.Errorf("unexpected number of UpdateFunc calls. want=%d have=%d", 1, len(mockCommitUpdater.UpdateFunc.History()))
 	} else if mockCommitUpdater.UpdateFunc.History()[0].Arg1 != 42 {
 		t.Errorf("unexpected value for repository id. want=%d have=%d", 42, mockCommitUpdater.UpdateFunc.History()[0].Arg1)
-	} else if !mockCommitUpdater.UpdateFunc.History()[0].Arg2 {
-		t.Errorf("unexpected value for blocking arg. want=%v have=%v", true, mockCommitUpdater.UpdateFunc.History()[0].Arg2)
 	}
 }
 
