@@ -16,7 +16,8 @@ type Updater interface {
 	Update(ctx context.Context, repositoryID int, blocking bool, check CheckFunc) error
 }
 
-// TODO - document, test new interface
+// CheckFunc is the shape of the function invoked to determine if an update is necessary
+// after successfully acquiring a lock.
 type CheckFunc func(ctx context.Context) (bool, error)
 
 type updater struct {
@@ -39,6 +40,11 @@ func NewUpdater(store store.Store, gitserverClient gitserver.Client) Updater {
 // If blocking is true, then this method will wait for an advisory lock to be granted. If
 // blocking is false, this procedure will only be performed if the commit graph for this
 // repository is not being calculated by another service.
+//
+// If a check function is supplied, it is called after acquiring the lock but before updating
+// the commit graph. This can be used to check that an update is still necessary depending on
+// the triggering conditions. Returning false from this function will cause the function to
+// return without updating. A null function can be passed to skip this check.
 func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool, check CheckFunc) (err error) {
 	ok, unlock, err := u.store.Lock(ctx, repositoryID, blocking)
 	if err != nil || !ok {
@@ -49,12 +55,8 @@ func (u *updater) Update(ctx context.Context, repositoryID int, blocking bool, c
 	}()
 
 	if check != nil {
-		ok, err := check(ctx)
-		if err != nil {
+		if ok, err := check(ctx); err != nil || !ok {
 			return err
-		}
-		if !ok {
-			return nil
 		}
 	}
 

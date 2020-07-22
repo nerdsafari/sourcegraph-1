@@ -28,7 +28,7 @@ func TestUpdate(t *testing.T) {
 	mockGitserverClient.CommitGraphFunc.SetDefaultReturn(graph, nil)
 	mockGitserverClient.HeadFunc.SetDefaultReturn("b", nil)
 
-	if err := NewUpdater(mockStore, mockGitserverClient).Update(context.Background(), 42, true); err != nil {
+	if err := NewUpdater(mockStore, mockGitserverClient).Update(context.Background(), 42, true, nil); err != nil {
 		t.Fatalf("unexpected error updating commit graph: %s", err)
 	}
 
@@ -76,7 +76,7 @@ func TestUpdateNoLock(t *testing.T) {
 	mockGitserverClient.CommitGraphFunc.SetDefaultReturn(graph, nil)
 	mockGitserverClient.HeadFunc.SetDefaultReturn("b", nil)
 
-	if err := NewUpdater(mockStore, mockGitserverClient).Update(context.Background(), 42, false); err != nil {
+	if err := NewUpdater(mockStore, mockGitserverClient).Update(context.Background(), 42, false, nil); err != nil {
 		t.Fatalf("unexpected error updating commit graph: %s", err)
 	}
 
@@ -90,6 +90,41 @@ func TestUpdateNoLock(t *testing.T) {
 		if call.Arg2 {
 			t.Errorf("unexpected blocking argument. want=%v have=%v", false, call.Arg2)
 		}
+	}
+
+	if len(mockStore.CalculateVisibleUploadsFunc.History()) != 0 {
+		t.Fatalf("unexpected calculate visible uploads call count. want=%d have=%d", 0, len(mockStore.CalculateVisibleUploadsFunc.History()))
+	}
+}
+
+func TestUpdateCheckFunc(t *testing.T) {
+	unlocked := false
+	unlock := func(err error) error {
+		unlocked = true
+		return err
+	}
+
+	mockStore := storemocks.NewMockStore()
+	mockStore.LockFunc.SetDefaultReturn(true, unlock, nil)
+	mockGitserverClient := gitservermocks.NewMockClient()
+
+	if err := NewUpdater(mockStore, mockGitserverClient).Update(context.Background(), 42, true, func(ctx context.Context) (bool, error) { return false, nil }); err != nil {
+		t.Fatalf("unexpected error updating commit graph: %s", err)
+	}
+
+	if len(mockStore.LockFunc.History()) != 1 {
+		t.Fatalf("unexpected lock call count. want=%d have=%d", 1, len(mockStore.LockFunc.History()))
+	} else {
+		call := mockStore.LockFunc.History()[0]
+		if call.Arg1 != 42 {
+			t.Errorf("unexpected repository id argument. want=%d have=%d", 42, call.Arg1)
+		}
+		if !call.Arg2 {
+			t.Errorf("unexpected blocking argument. want=%v have=%v", true, call.Arg2)
+		}
+	}
+	if !unlocked {
+		t.Errorf("advisory lock not released")
 	}
 
 	if len(mockStore.CalculateVisibleUploadsFunc.History()) != 0 {
