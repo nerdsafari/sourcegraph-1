@@ -165,10 +165,14 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 	return nil
 }
 
-// TODO - document
+// MaxPostgresNumParameters is the maximum number of parameters per query that Postgres
+// will allow. Exceeding this number of parameters will cause the query to be rejected
+// by the server.
 const MaxPostgresNumParameters = 65535
 
-// TODO - document, test
+// batchQueries cuts the given query slice into batches of a maximum size. This function
+// will allocate only the outer array to hold each batch, and the data for each batch
+// will refer to the given slice.
 func batchQueries(queries []*sqlf.Query, batchSize int) (batches [][]*sqlf.Query) {
 	for len(queries) > 0 {
 		if len(queries) > batchSize {
