@@ -35,12 +35,16 @@ func TestUpdater(t *testing.T) {
 			{51, 2},
 			{52, 6},
 		}
-		for i, testCase := range testCases {
-			if updater.TryUpdateFunc.History()[i].Arg1 != testCase.repositoryID {
-				t.Errorf("unexpected repository id arg. want=%d have=%d", testCase.repositoryID, updater.TryUpdateFunc.History()[0].Arg1)
+		for _, testCase := range testCases {
+			found := false
+			for _, call := range updater.TryUpdateFunc.History() {
+				if call.Arg1 == testCase.repositoryID && call.Arg2 == testCase.dirtyFlag {
+					found = true
+				}
 			}
-			if updater.TryUpdateFunc.History()[i].Arg2 != testCase.dirtyFlag {
-				t.Errorf("unexpected dirty flag arg. want=%d have=%d", testCase.dirtyFlag, updater.TryUpdateFunc.History()[0].Arg2)
+
+			if !found {
+				t.Errorf("unexpected call with args (%d, %d)", testCase.repositoryID, testCase.dirtyFlag)
 			}
 		}
 	}
