@@ -233,14 +233,20 @@ func TestPackageReferencePager(t *testing.T) {
 	store := testStore()
 
 	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(1), VisibleAtTip: true},
-		Upload{ID: 2, Commit: makeCommit(2), VisibleAtTip: true, RepositoryID: 51},
-		Upload{ID: 3, Commit: makeCommit(3), VisibleAtTip: true, RepositoryID: 52},
-		Upload{ID: 4, Commit: makeCommit(4), VisibleAtTip: true, RepositoryID: 53},
-		Upload{ID: 5, Commit: makeCommit(5), VisibleAtTip: true, RepositoryID: 54},
-		Upload{ID: 6, Commit: makeCommit(6), VisibleAtTip: false, RepositoryID: 55},
-		Upload{ID: 7, Commit: makeCommit(6), VisibleAtTip: true, RepositoryID: 56},
+		Upload{ID: 1, Commit: makeCommit(1)},
+		Upload{ID: 2, Commit: makeCommit(2), RepositoryID: 51},
+		Upload{ID: 3, Commit: makeCommit(3), RepositoryID: 52},
+		Upload{ID: 4, Commit: makeCommit(4), RepositoryID: 53},
+		Upload{ID: 5, Commit: makeCommit(5), RepositoryID: 54},
+		Upload{ID: 6, Commit: makeCommit(6), RepositoryID: 55},
+		Upload{ID: 7, Commit: makeCommit(6), RepositoryID: 56},
 	)
+	insertVisibleAtTip(t, dbconn.Global, 50, 1)
+	insertVisibleAtTip(t, dbconn.Global, 51, 2)
+	insertVisibleAtTip(t, dbconn.Global, 52, 3)
+	insertVisibleAtTip(t, dbconn.Global, 53, 4)
+	insertVisibleAtTip(t, dbconn.Global, 54, 5)
+	insertVisibleAtTip(t, dbconn.Global, 56, 7)
 
 	expected := []types.PackageReference{
 		{DumpID: 2, Scheme: "gomod", Name: "leftpad", Version: "0.1.0", Filter: []byte("f2")},
@@ -297,16 +303,25 @@ func TestPackageReferencePagerPages(t *testing.T) {
 	store := testStore()
 
 	insertUploads(t, dbconn.Global,
-		Upload{ID: 1, Commit: makeCommit(1), VisibleAtTip: true, RepositoryID: 51},
-		Upload{ID: 2, Commit: makeCommit(2), VisibleAtTip: true, RepositoryID: 52},
-		Upload{ID: 3, Commit: makeCommit(3), VisibleAtTip: true, RepositoryID: 53},
-		Upload{ID: 4, Commit: makeCommit(4), VisibleAtTip: true, RepositoryID: 54},
-		Upload{ID: 5, Commit: makeCommit(5), VisibleAtTip: true, RepositoryID: 55},
-		Upload{ID: 6, Commit: makeCommit(6), VisibleAtTip: true, RepositoryID: 56},
-		Upload{ID: 7, Commit: makeCommit(7), VisibleAtTip: true, RepositoryID: 57},
-		Upload{ID: 8, Commit: makeCommit(8), VisibleAtTip: true, RepositoryID: 58},
-		Upload{ID: 9, Commit: makeCommit(9), VisibleAtTip: true, RepositoryID: 59},
+		Upload{ID: 1, Commit: makeCommit(1), RepositoryID: 51},
+		Upload{ID: 2, Commit: makeCommit(2), RepositoryID: 52},
+		Upload{ID: 3, Commit: makeCommit(3), RepositoryID: 53},
+		Upload{ID: 4, Commit: makeCommit(4), RepositoryID: 54},
+		Upload{ID: 5, Commit: makeCommit(5), RepositoryID: 55},
+		Upload{ID: 6, Commit: makeCommit(6), RepositoryID: 56},
+		Upload{ID: 7, Commit: makeCommit(7), RepositoryID: 57},
+		Upload{ID: 8, Commit: makeCommit(8), RepositoryID: 58},
+		Upload{ID: 9, Commit: makeCommit(9), RepositoryID: 59},
 	)
+	insertVisibleAtTip(t, dbconn.Global, 51, 1)
+	insertVisibleAtTip(t, dbconn.Global, 52, 2)
+	insertVisibleAtTip(t, dbconn.Global, 53, 3)
+	insertVisibleAtTip(t, dbconn.Global, 54, 4)
+	insertVisibleAtTip(t, dbconn.Global, 55, 5)
+	insertVisibleAtTip(t, dbconn.Global, 56, 6)
+	insertVisibleAtTip(t, dbconn.Global, 57, 7)
+	insertVisibleAtTip(t, dbconn.Global, 58, 8)
+	insertVisibleAtTip(t, dbconn.Global, 59, 9)
 
 	expected := []types.PackageReference{
 		{DumpID: 1, Scheme: "gomod", Name: "leftpad", Version: "0.1.0", Filter: []byte("f1")},

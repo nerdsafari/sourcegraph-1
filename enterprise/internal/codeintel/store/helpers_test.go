@@ -64,7 +64,6 @@ func insertUploads(t *testing.T, db *sql.DB, uploads ...Upload) {
 				id,
 				commit,
 				root,
-				visible_at_tip,
 				uploaded_at,
 				state,
 				failure_message,
@@ -77,12 +76,11 @@ func insertUploads(t *testing.T, db *sql.DB, uploads ...Upload) {
 				num_parts,
 				uploaded_parts,
 				upload_size
-			) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+			) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 		`,
 			upload.ID,
 			upload.Commit,
 			upload.Root,
-			upload.VisibleAtTip,
 			upload.UploadedAt,
 			upload.State,
 			upload.FailureMessage,
@@ -175,6 +173,23 @@ func insertPackageReferences(t *testing.T, store Store, packageReferences []type
 	}
 }
 
+// insertVisibleAtTip populates rows of the lsif_uploads_visible_at_tip table for the given repository
+// with the given identifiers.
+func insertVisibleAtTip(t *testing.T, db *sql.DB, repositoryID int, uploadIDs ...int) {
+	var rows []*sqlf.Query
+	for _, uploadID := range uploadIDs {
+		rows = append(rows, sqlf.Sprintf("(%s, %s)", repositoryID, uploadID))
+	}
+
+	query := sqlf.Sprintf(
+		`INSERT INTO lsif_uploads_visible_at_tip (repository_id, upload_id) VALUES %s`,
+		sqlf.Join(rows, ","),
+	)
+	if _, err := db.ExecContext(context.Background(), query.Query(sqlf.PostgresBindVar), query.Args()...); err != nil {
+		t.Fatalf("unexpected error while updating uploads visible at tip: %s", err)
+	}
+}
+
 // insertNearestUploads populates the lsif_nearest_uploads table with the given upload metadata.
 func insertNearestUploads(t *testing.T, db *sql.DB, repositoryID int, uploads map[string][]UploadMeta) {
 	var rows []*sqlf.Query
@@ -189,7 +204,7 @@ func insertNearestUploads(t *testing.T, db *sql.DB, repositoryID int, uploads ma
 		sqlf.Join(rows, ","),
 	)
 	if _, err := db.ExecContext(context.Background(), query.Query(sqlf.PostgresBindVar), query.Args()...); err != nil {
-		t.Fatalf("unexpected error while upserting repository: %s", err)
+		t.Fatalf("unexpected error while updating commit graph: %s", err)
 	}
 }
 

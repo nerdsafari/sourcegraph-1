@@ -47,7 +47,6 @@ func TestGetDumpByID(t *testing.T) {
 		ID:             expected.ID,
 		Commit:         expected.Commit,
 		Root:           expected.Root,
-		VisibleAtTip:   expected.VisibleAtTip,
 		UploadedAt:     expected.UploadedAt,
 		State:          expected.State,
 		FailureMessage: expected.FailureMessage,
@@ -59,6 +58,7 @@ func TestGetDumpByID(t *testing.T) {
 		RepositoryName: expected.RepositoryName,
 		Indexer:        expected.Indexer,
 	})
+	insertVisibleAtTip(t, dbconn.Global, 50, 1)
 
 	if dump, exists, err := store.GetDumpByID(context.Background(), 1); err != nil {
 		t.Fatalf("unexpected error getting dump: %s", err)
@@ -453,10 +453,11 @@ func TestDeleteOldestDump(t *testing.T) {
 
 	insertUploads(t, dbconn.Global,
 		Upload{ID: 1, UploadedAt: t1},
-		Upload{ID: 2, UploadedAt: t2, VisibleAtTip: true},
+		Upload{ID: 2, UploadedAt: t2},
 		Upload{ID: 3, UploadedAt: t3},
 		Upload{ID: 4, UploadedAt: t4},
 	)
+	insertVisibleAtTip(t, dbconn.Global, 50, 2)
 
 	// Prune oldest
 	if id, prunable, err := store.DeleteOldestDump(context.Background()); err != nil {

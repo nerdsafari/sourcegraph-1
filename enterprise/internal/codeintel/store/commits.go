@@ -36,6 +36,9 @@ func scanUploadMeta(rows *sql.Rows, queryErr error) (_ map[string][]UploadMeta, 
 
 // HasCommit determines if the given commit is known for the given repository.
 func (s *store) HasCommit(ctx context.Context, repositoryID int, commit string) (bool, error) {
+	// TODO - can this trigger a bad update loop for
+	// repos with no data or weirdly unreachable commits?
+
 	count, _, err := scanFirstInt(s.query(ctx, sqlf.Sprintf(`
 		SELECT COUNT(*)
 		FROM lsif_nearest_uploads
@@ -73,12 +76,12 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 	}
 	defer func() { err = tx.Done(err) }()
 
-	// Pull all upload metadata known to this repository so we can correlate it
-	// with the current commit graph.
+	// Pull all queryable upload metadata known to this repository so we can correlate
+	// it with the current  commit graph.
 	uploadMeta, err := scanUploadMeta(tx.query(ctx, sqlf.Sprintf(`
 		SELECT id, commit, root, indexer
 		FROM lsif_uploads
-		WHERE repository_id = %s
+		WHERE state = 'completed' AND repository_id = %s
 	`, repositoryID)))
 	if err != nil {
 		return err
@@ -91,19 +94,24 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 	}
 
 	// Clear all old visibility data for this repository
-	if err := tx.queryForEffect(ctx, sqlf.Sprintf(`DELETE FROM lsif_nearest_uploads WHERE repository_id = %s`, repositoryID)); err != nil {
-		return err
+	for _, query := range []string{
+		`DELETE FROM lsif_nearest_uploads WHERE repository_id = %s`,
+		`DELETE FROM lsif_uploads_visible_at_tip WHERE repository_id = %s`,
+	} {
+		if err := tx.queryForEffect(ctx, sqlf.Sprintf(query, repositoryID)); err != nil {
+			return err
+		}
 	}
 
 	n := 0
 	for _, uploads := range visibleUploads {
 		n += len(uploads)
 	}
-	rows := make([]*sqlf.Query, 0, n)
+	nearestUploadsRows := make([]*sqlf.Query, 0, n)
 
 	for commit, uploads := range visibleUploads {
 		for _, uploadMeta := range uploads {
-			rows = append(rows, sqlf.Sprintf(
+			nearestUploadsRows = append(nearestUploadsRows, sqlf.Sprintf(
 				"(%s, %s, %s, %s)",
 				repositoryID,
 				commit,
@@ -113,10 +121,10 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 		}
 	}
 
-	// Insert new data for this repository in batches - it's likely we'll exceed the
-	// maximum number of placeholders per query so we need to break it into several
-	// queries below this size.
-	for _, batch := range batchQueries(rows, MaxPostgresNumParameters/4) {
+	// Insert new data for this repository in batches - it's likely we'll exceed the maximum
+	// number of placeholders per query so we need to break it into several queries below this
+	// size.
+	for _, batch := range batchQueries(nearestUploadsRows, MaxPostgresNumParameters/4) {
 		if err := tx.queryForEffect(ctx, sqlf.Sprintf(
 			`INSERT INTO lsif_nearest_uploads (repository_id, "commit", upload_id, distance) VALUES %s`,
 			sqlf.Join(batch, ","),
@@ -125,28 +133,23 @@ func (s *store) CalculateVisibleUploads(ctx context.Context, repositoryID int, g
 		}
 	}
 
-	var ids []*sqlf.Query
+	visibleAtTipRows := make([]*sqlf.Query, 0, len(visibleUploads[tipCommit]))
 	for _, uploadMeta := range visibleUploads[tipCommit] {
-		ids = append(ids, sqlf.Sprintf("%s", uploadMeta.UploadID))
+		visibleAtTipRows = append(visibleAtTipRows, sqlf.Sprintf("(%s, %s)", repositoryID, uploadMeta.UploadID))
 	}
 
-	var setCond *sqlf.Query
-	if len(ids) == 0 {
-		setCond = sqlf.Sprintf("false")
-	} else {
-		setCond = sqlf.Sprintf(`(id IN (%s))`, sqlf.Join(ids, ","))
-	}
-
-	// TODO - store this in an external table
 	// Update which repositories are visible from the tip of the default branch. This
 	// flag is used to determine which bundles for a repository we open during a global
 	// find references query.
-	if err := tx.queryForEffect(ctx, sqlf.Sprintf(
-		`UPDATE lsif_uploads SET visible_at_tip = %s WHERE repository_id = %s`,
-		setCond,
-		repositoryID,
-	)); err != nil {
-		return err
+	if len(visibleAtTipRows) > 0 {
+		for _, batch := range batchQueries(visibleAtTipRows, MaxPostgresNumParameters/2) {
+			if err := tx.queryForEffect(ctx, sqlf.Sprintf(
+				`INSERT INTO lsif_uploads_visible_at_tip (repository_id, upload_id) VALUES %s`,
+				sqlf.Join(batch, ","),
+			)); err != nil {
+				return err
+			}
+		}
 	}
 
 	// TODO - ensure some token matches

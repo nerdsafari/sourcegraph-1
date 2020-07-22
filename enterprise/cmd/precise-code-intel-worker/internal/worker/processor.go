@@ -198,6 +198,10 @@ func (p *processor) updateXrepoData(ctx context.Context, store store.Store, uplo
 		return errors.Wrap(err, "store.DeleteOverlappingDumps")
 	}
 
+	//
+	// TODO - can simplify this flow now!
+	//
+
 	// Almost-success: we need to mark this upload as complete at this point as the next step changes
 	// the visibility of the dumps for this repository. This requires that the new dump be available in
 	// the lsif_dumps view, which requires a change of state. In the event of a future failure we can

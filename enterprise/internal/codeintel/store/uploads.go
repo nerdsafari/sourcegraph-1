@@ -151,7 +151,7 @@ func (s *store) GetUploadByID(ctx context.Context, id int) (Upload, bool, error)
 			u.id,
 			u.commit,
 			u.root,
-			u.visible_at_tip,
+			EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip where repository_id = u.repository_id and upload_id = u.id) AS visible_at_tip,
 			u.uploaded_at,
 			u.state,
 			u.failure_message,
@@ -207,7 +207,7 @@ func (s *store) GetUploads(ctx context.Context, opts GetUploadsOptions) (_ []Upl
 		conds = append(conds, sqlf.Sprintf("u.state = %s", opts.State))
 	}
 	if opts.VisibleAtTip {
-		conds = append(conds, sqlf.Sprintf("u.visible_at_tip = true"))
+		conds = append(conds, sqlf.Sprintf("EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip where repository_id = u.repository_id and upload_id = u.id)"))
 	}
 	if opts.UploadedBefore != nil {
 		conds = append(conds, sqlf.Sprintf("u.uploaded_at < %s", *opts.UploadedBefore))
@@ -232,7 +232,7 @@ func (s *store) GetUploads(ctx context.Context, opts GetUploadsOptions) (_ []Upl
 				u.id,
 				u.commit,
 				u.root,
-				u.visible_at_tip,
+				EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip where repository_id = u.repository_id and upload_id = u.id) AS visible_at_tip,
 				u.uploaded_at,
 				u.state,
 				u.failure_message,
@@ -361,7 +361,7 @@ var uploadColumnsWithNullRank = []*sqlf.Query{
 	sqlf.Sprintf("u.id"),
 	sqlf.Sprintf("u.commit"),
 	sqlf.Sprintf("u.root"),
-	sqlf.Sprintf("u.visible_at_tip"),
+	sqlf.Sprintf("EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip where repository_id = u.repository_id and upload_id = u.id) AS visible_at_tip"),
 	sqlf.Sprintf("u.uploaded_at"),
 	sqlf.Sprintf("u.state"),
 	sqlf.Sprintf("u.failure_message"),
@@ -457,7 +457,7 @@ func (s *store) DeleteUploadsWithoutRepository(ctx context.Context, now time.Tim
 			SELECT r.id AS id FROM repo r
 			WHERE
 				%s - r.deleted_at >= %s * interval '1 second' AND
-				EXISTS (SELECT COUNT(*) from lsif_uploads u WHERE u.repository_id = r.id)
+				EXISTS (SELECT 1 from lsif_uploads u WHERE u.repository_id = r.id)
 		),
 		deleted_uploads AS (
 			DELETE FROM lsif_uploads u WHERE repository_id IN (SELECT id FROM deleted_repos)

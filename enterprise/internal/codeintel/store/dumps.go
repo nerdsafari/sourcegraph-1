@@ -78,7 +78,7 @@ func (s *store) GetDumpByID(ctx context.Context, id int) (Dump, bool, error) {
 			d.id,
 			d.commit,
 			d.root,
-			d.visible_at_tip,
+			EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip where repository_id = d.repository_id and upload_id = d.id) AS visible_at_tip,
 			d.uploaded_at,
 			d.state,
 			d.failure_message,
@@ -115,8 +115,8 @@ func (s *store) FindClosestDumps(ctx context.Context, repositoryID int, commit, 
 	 		SELECT
 	 			d.id,
 	 			d.commit,
-	 			d.root,
-	 			d.visible_at_tip,
+				d.root,
+				EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip where repository_id = d.repository_id and upload_id = d.id) AS visible_at_tip,
 	 			d.uploaded_at,
 	 			d.state,
 	 			d.failure_message,
@@ -137,12 +137,16 @@ func (s *store) FindClosestDumps(ctx context.Context, repositoryID int, commit, 
 // DeleteOldestDump deletes the oldest dump that is not currently visible at the tip of its repository's default branch.
 // This method returns the deleted dump's identifier and a flag indicating its (previous) existence.
 func (s *store) DeleteOldestDump(ctx context.Context) (int, bool, error) {
+	//
+	// TODO - need to also mark repository as dirty here
+	//
+
 	return scanFirstInt(s.query(ctx, sqlf.Sprintf(`
 		DELETE FROM lsif_uploads
 		WHERE id IN (
-			SELECT id FROM lsif_dumps_with_repository_name
-			WHERE visible_at_tip = false
-			ORDER BY uploaded_at
+			SELECT d.id FROM lsif_dumps_with_repository_name d
+			WHERE NOT EXISTS (SELECT 1 FROM lsif_uploads_visible_at_tip WHERE repository_id = d.repository_id AND upload_id = d.id)
+			ORDER BY d.uploaded_at
 			LIMIT 1
 		) RETURNING id
 	`)))
